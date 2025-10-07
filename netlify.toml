@@ -1,7 +1,7 @@
 [build]
-  command = "npm install -g pnpm && pnpm install && pnpm build --filter web"
-  publish = "apps/web/dist"
+  base = "apps/web"
+  command = "npm install && chmod +x netlify-build.sh && ./netlify-build.sh"
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "18"
-  NPM_FLAGS = "--prefix=/opt/buildhome/.nvm/versions/node/v18.20.4"
