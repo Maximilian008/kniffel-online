@@ -1,0 +1,16 @@
+{
+  "name": "kniffel-online",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "start": "pnpm --filter server start",
+    "dev:server": "pnpm --filter server dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:web\"",
+    "clean": "pnpm -r clean && rm -rf node_modules/.pnpm"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
