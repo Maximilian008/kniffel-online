@@ -1,6 +1,6 @@
 [build]
   base = "apps/web"
-  command = "npm install && chmod +x netlify-build.sh && ./netlify-build.sh"
+  command = "chmod +x netlify-build.sh && ./netlify-build.sh"
   publish = "dist"
 
 [build.environment]

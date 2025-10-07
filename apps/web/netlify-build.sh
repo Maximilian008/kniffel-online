@@ -1,7 +1,13 @@
 #!/bin/bash
 echo "Building for Netlify..."
 
-# Copy shared packages to node_modules
+# Replace package.json with Netlify-compatible version
+cp package.netlify.json package.json
+
+# Install dependencies (without workspace references)
+npm install
+
+# Copy shared packages to node_modules manually
 echo "Setting up workspace dependencies..."
 mkdir -p node_modules/@shared
 mkdir -p node_modules/@game
