@@ -1,6 +1,7 @@
 [build]
-  command = "npm install && cd apps/web && npm run build"
+  command = "npm install -g pnpm && pnpm install && pnpm build --filter web"
   publish = "apps/web/dist"
 
 [build.environment]
   NODE_VERSION = "18"
+  NPM_FLAGS = "--prefix=/opt/buildhome/.nvm/versions/node/v18.20.4"
