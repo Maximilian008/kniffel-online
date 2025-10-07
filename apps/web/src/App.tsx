@@ -1,4 +1,4 @@
-﻿import { scoreAllCategories } from "./utils/gameRules";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   Category,
   GamePhase,
@@ -6,7 +6,7 @@ import type {
   PlayerIndex,
   SerializedGameState,
 } from "./types/shared";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { scoreAllCategories } from "./utils/gameRules";
 
 import GameScreen from "./components/GameScreen";
 import HistoryPanel from "./components/HistoryPanel";

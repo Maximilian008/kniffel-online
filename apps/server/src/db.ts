@@ -1,11 +1,11 @@
+import fs from "node:fs";
+import path from "node:path";
 import type {
   Category,
   HistoryEntry,
   ScoreSheet,
   SerializedGameState,
 } from "./types/shared.js";
-import fs from "node:fs";
-import path from "node:path";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "kniffel.json");

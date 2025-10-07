@@ -1,14 +1,4 @@
-﻿import { rollDice, scoreCategory } from "./utils/gameRules.js";
-import type {
-  Category,
-  Dice,
-  GameState,
-  HistoryEntry,
-  PlayerIndex,
-  SerializedGameState,
-} from "./types/shared.js";
-import { MAX_ROLLS_PER_TURN } from "./types/shared.js";
-import dotenv from "dotenv";
+﻿import dotenv from "dotenv";
 import express from "express";
 import http from "http";
 import { randomBytes } from "node:crypto";
@@ -25,6 +15,16 @@ import {
   saveGame,
   toPersistedGame,
 } from "./db.js";
+import type {
+  Category,
+  Dice,
+  GameState,
+  HistoryEntry,
+  PlayerIndex,
+  SerializedGameState,
+} from "./types/shared.js";
+import { MAX_ROLLS_PER_TURN } from "./types/shared.js";
+import { rollDice, scoreCategory } from "./utils/gameRules.js";
 
 dotenv.config();
 initDb();

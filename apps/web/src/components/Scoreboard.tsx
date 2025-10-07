@@ -1,10 +1,10 @@
-﻿import type {
+﻿import { useState } from "react";
+import { soundManager } from "../lib/sounds";
+import type {
   Category,
   PlayerIndex,
   SerializedGameState,
 } from "../types/shared";
-import { useState } from "react";
-import { soundManager } from "../lib/sounds";
 
 const CATEGORY_LABELS: Record<Category, string> = {
   ones: "Einser",

@@ -1,4 +1,4 @@
-﻿[build]
+[build]
   base = "."
   command = "pnpm install --frozen-lockfile && pnpm --filter web build"
   publish = "apps/web/dist"

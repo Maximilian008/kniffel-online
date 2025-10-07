@@ -1,10 +1,10 @@
+import { useEffect } from "react";
+import { soundManager } from "../lib/sounds";
 import type {
   Category,
   PlayerIndex,
   SerializedGameState,
 } from "../types/shared";
-import { useEffect } from "react";
-import { soundManager } from "../lib/sounds";
 import DiceAnimation from "./DiceAnimation3D";
 import Dice from "./DiceSimple";
 import Scoreboard from "./Scoreboard";

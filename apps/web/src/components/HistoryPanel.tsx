@@ -1,5 +1,5 @@
-﻿import type { HistoryEntry } from "../types/shared";
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
+import type { HistoryEntry } from "../types/shared";
 import HistoryDetail from "./HistoryDetail";
 
 type Props = {
