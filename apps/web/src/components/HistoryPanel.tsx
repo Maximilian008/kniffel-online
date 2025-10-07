@@ -1,4 +1,4 @@
-﻿import type { HistoryEntry } from "@shared/lib";
+﻿import type { HistoryEntry } from "../types/shared";
 import { useMemo, useState } from "react";
 import HistoryDetail from "./HistoryDetail";
 

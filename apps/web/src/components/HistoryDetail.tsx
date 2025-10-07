@@ -1,4 +1,4 @@
-import type { Category, HistoryEntry } from "@shared/lib";
+import type { Category, HistoryEntry } from "../types/shared";
 
 type Props = {
   entry: HistoryEntry;

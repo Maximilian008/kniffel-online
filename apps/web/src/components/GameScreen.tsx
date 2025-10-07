@@ -2,7 +2,7 @@ import type {
   Category,
   PlayerIndex,
   SerializedGameState,
-} from "@shared/lib";
+} from "../types/shared";
 import { useEffect } from "react";
 import { soundManager } from "../lib/sounds";
 import DiceAnimation from "./DiceAnimation3D";

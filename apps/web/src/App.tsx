@@ -1,11 +1,11 @@
-﻿import { scoreAllCategories } from "@game/rules";
+﻿import { scoreAllCategories } from "./utils/gameRules";
 import type {
   Category,
   GamePhase,
   HistoryEntry,
   PlayerIndex,
   SerializedGameState,
-} from "@shared/lib";
+} from "./types/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import GameScreen from "./components/GameScreen";

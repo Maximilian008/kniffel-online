@@ -2,7 +2,7 @@
   Category,
   PlayerIndex,
   SerializedGameState,
-} from "@shared/lib";
+} from "../types/shared";
 import { useState } from "react";
 import { soundManager } from "../lib/sounds";
 

@@ -1,4 +1,4 @@
-﻿import type { SerializedGameState } from "@shared/lib";
+﻿import type { SerializedGameState } from "../types/shared";
 import Scoreboard from "./Scoreboard";
 
 const DEFAULT_NAMES: [string, string] = ["Player 1", "Player 2"];
