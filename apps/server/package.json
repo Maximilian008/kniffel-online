@@ -10,8 +10,6 @@
     "build": "tsc --project tsconfig.json"
   },
   "dependencies": {
-    "@game/rules": "workspace:*",
-    "@shared/lib": "workspace:*",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.4.1",
     "cors": "^2.8.5",

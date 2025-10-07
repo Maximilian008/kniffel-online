@@ -3,7 +3,7 @@ import type {
   HistoryEntry,
   ScoreSheet,
   SerializedGameState,
-} from "@shared/lib";
+} from "./types/shared.js";
 import fs from "node:fs";
 import path from "node:path";
 

@@ -1,4 +1,4 @@
-﻿import { rollDice, scoreCategory } from "@game/rules";
+﻿import { rollDice, scoreCategory } from "./utils/gameRules.js";
 import type {
   Category,
   Dice,
@@ -6,8 +6,8 @@ import type {
   HistoryEntry,
   PlayerIndex,
   SerializedGameState,
-} from "@shared/lib";
-import { MAX_ROLLS_PER_TURN } from "@shared/lib";
+} from "./types/shared.js";
+import { MAX_ROLLS_PER_TURN } from "./types/shared.js";
 import dotenv from "dotenv";
 import express from "express";
 import http from "http";
