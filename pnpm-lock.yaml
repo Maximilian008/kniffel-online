@@ -14,12 +14,6 @@ importers:
 
   apps/server:
     dependencies:
-      '@game/rules':
-        specifier: workspace:*
-        version: link:../../packages/game-rules
-      '@shared/lib':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
