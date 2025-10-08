@@ -1,4 +1,4 @@
-﻿import { rollDice, scoreAllCategories } from "./index";
+import { rollDice, scoreAllCategories } from "./index.js";
 
 const dice = rollDice();
 console.log("Rolled:", dice);

@@ -3,14 +3,24 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm run build:packages && pnpm --filter web build && pnpm --filter server build",
     "start": "pnpm --filter server start",
     "dev:server": "pnpm --filter server dev",
     "dev:web": "pnpm --filter web dev",
     "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:web\"",
-    "clean": "pnpm -r clean && rm -rf node_modules/.pnpm"
+    "clean": "pnpm -r clean && rm -rf node_modules/.pnpm",
+    "build:packages": "pnpm --filter \"./packages/*\" build",
+    "build:web": "pnpm run build:packages && pnpm --filter web build",
+    "build:server": "pnpm run build:packages && pnpm --filter server build",
+    "smoke:web": "node ./scripts/smoke-web.mjs",
+    "smoke:server": "node ./scripts/smoke-server.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "packageManager": "pnpm@9.11.0",
+  "engines": {
+    "node": ">=20 <21",
+    "pnpm": ">=9.11.0 <10"
   }
 }

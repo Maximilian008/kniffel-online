@@ -1,7 +1,7 @@
 [build]
-  base = "."
-  command = "pnpm install --frozen-lockfile && pnpm --filter web build"
+  command = "corepack enable && corepack prepare pnpm@9.11.0 --activate && pnpm install --frozen-lockfile=false && pnpm run build:web"
   publish = "apps/web/dist"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
+  PNPM_VERSION = "9.11.0"
