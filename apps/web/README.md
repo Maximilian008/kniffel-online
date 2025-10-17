@@ -70,4 +70,15 @@ export default defineConfig([
     },
   },
 ])
+## Production configuration for Kniffel Online
+
+The frontend needs to know the backend URL when deployed. Set one of these variables in your hosting provider (Netlify, Vercel, etc.) at build time:
+
+- `VITE_SOCKET_URL` – WebSocket/HTTP base (e.g., your Railway service URL)
+- `VITE_SERVER_URL` – Alternative name for the same value (fallback)
+- `VITE_API_URL` – Explicit API base; if set, used for HTTP fetches like `/api/history`
+
+Resolution order in the code: `VITE_API_URL` > `VITE_SOCKET_URL` > `VITE_SERVER_URL` > `window.location.origin`.
+
+During local development, the Vite dev server proxies API and websocket requests to `http://localhost:3000` (see `vite.config.ts`).
 ```

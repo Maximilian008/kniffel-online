@@ -1,4 +1,4 @@
-﻿import type { Dice, Die, Category } from "@shared/lib";
+﻿import type { Dice, Die, Category } from "./types.js";
 
 // Utility helpers
 const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
@@ -39,20 +39,23 @@ const isSmallStraight = (dice: Dice) => {
 export const scoreCategory = (dice: Dice, cat: Category): number => {
   const values = [...dice];
   switch (cat) {
-    case "ones":   return values.filter((v) => v === 1).length * 1;
-    case "twos":   return values.filter((v) => v === 2).length * 2;
+    case "ones": return values.filter((v) => v === 1).length * 1;
+    case "twos": return values.filter((v) => v === 2).length * 2;
     case "threes": return values.filter((v) => v === 3).length * 3;
-    case "fours":  return values.filter((v) => v === 4).length * 4;
-    case "fives":  return values.filter((v) => v === 5).length * 5;
-    case "sixes":  return values.filter((v) => v === 6).length * 6;
+    case "fours": return values.filter((v) => v === 4).length * 4;
+    case "fives": return values.filter((v) => v === 5).length * 5;
+    case "sixes": return values.filter((v) => v === 6).length * 6;
 
-    case "threeKind":     return hasNOfAKind(dice, 3) ? sum(values) : 0;
-    case "fourKind":      return hasNOfAKind(dice, 4) ? sum(values) : 0;
-    case "fullHouse":     return isFullHouse(dice) ? 25 : 0;
+    case "threeKind": return hasNOfAKind(dice, 3) ? sum(values) : 0;
+    case "fourKind": return hasNOfAKind(dice, 4) ? sum(values) : 0;
+    case "fullHouse": return isFullHouse(dice) ? 25 : 0;
     case "smallStraight": return isSmallStraight(dice) ? 30 : 0;
     case "largeStraight": return isLargeStraight(dice) ? 40 : 0;
-    case "yahtzee":       return hasNOfAKind(dice, 5) ? 50 : 0;
-    case "chance":        return sum(values);
+    case "yahtzee": return hasNOfAKind(dice, 5) ? 50 : 0;
+    case "chance": return sum(values);
+    default:
+      // Should be unreachable if Category is exhaustive, but keep a safe default
+      return 0;
   }
 };
 

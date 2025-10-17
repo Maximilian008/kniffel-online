@@ -11,10 +11,19 @@
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/lib": ["../shared/src/index.ts"],
+      "@shared/lib/*": ["../shared/src/*"]
+    }
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../shared" }
+    {
+      "path": "../shared"
+    }
   ]
 }

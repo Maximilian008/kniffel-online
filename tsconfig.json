@@ -1,6 +1,11 @@
 {
   "compilerOptions": {
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/lib": ["packages/shared/src/index.ts"],
+      "@shared/lib/*": ["packages/shared/src/*"]
+    }
   }
 }

@@ -76,7 +76,7 @@ export default function Scoreboard({
   previewScores,
   onChoose,
 }: Props) {
-  const usedSets = state.usedCategories.map((list) => new Set(list)) as [
+  const usedSets = state.usedCategories.map((list: Category[]) => new Set(list)) as [
     Set<Category>,
     Set<Category>
   ];

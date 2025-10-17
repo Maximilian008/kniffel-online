@@ -13,6 +13,7 @@ import HistoryPanel from "./components/HistoryPanel";
 import ResultScreen from "./components/ResultScreen";
 import RoleSelectModal from "./components/RoleSelectModal";
 import SetupScreen from "./components/SetupScreen";
+import HelpModal from "./components/HelpModal";
 import { usePlayerIdentity } from "./hooks/usePlayerIdentity";
 import { createSocket, ROLE_LABELS, type AppSocket, type OpponentStatusPayload } from "./lib/socket";
 
@@ -87,15 +88,22 @@ export default function App() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [isRolling, setIsRolling] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  const socketUrl = useMemo(() => {
-    if (typeof window === "undefined") return undefined;
-    // In development, use proxy. In production, use VITE_SOCKET_URL or current origin
-    const envUrl = import.meta.env.VITE_SOCKET_URL as string | undefined;
-    if (envUrl) return envUrl;
-    // Development: use current origin (proxy will handle it)
-    // Production: use current origin
-    return window.location.origin;
+  // Resolve server base URLs for sockets and API
+  const { socketUrl, apiBaseUrl } = useMemo(() => {
+    if (typeof window === "undefined") return { socketUrl: undefined, apiBaseUrl: "" } as const;
+    const isDev = import.meta.env.DEV;
+    const envServer = (import.meta.env.VITE_SOCKET_URL as string | undefined)
+      || (import.meta.env.VITE_SERVER_URL as string | undefined)
+      || undefined;
+    if (isDev) {
+      // In dev we rely on Vite proxy, so use the current origin and relative API
+      return { socketUrl: window.location.origin, apiBaseUrl: "" } as const;
+    }
+    // In production we expect an explicit backend URL; if missing, fall back to same-origin
+    const resolved = envServer ?? window.location.origin;
+    return { socketUrl: resolved, apiBaseUrl: resolved } as const;
   }, []);
 
   useEffect(() => {
@@ -159,7 +167,6 @@ export default function App() {
     closeModal,
     claimRole,
     releaseRole,
-    resetSession,
     isClaiming,
     error: roleError,
     clearError,
@@ -230,13 +237,40 @@ export default function App() {
   useEffect(() => {
     if (!historyOpen) return;
     fetchHistory().catch(() => {
-      socketRef.current?.emit("request-history");
+      const filter = getHistoryFilter();
+      socketRef.current?.emit("request-history", filter);
     });
   }, [historyOpen]);
 
+  // Build history filter based on current identity and known player names
+  function getHistoryFilter(): { players?: string[]; limit?: number; mode?: "exact" | "contains" } {
+    const pNames = gameState?.playerNames ?? ["", ""];
+    const a = (pNames[0] ?? "").trim();
+    const b = (pNames[1] ?? "").trim();
+    const knownBoth = a.length > 0 && b.length > 0;
+    if (knownBoth) {
+      return { players: [a, b], limit: 50, mode: "exact" };
+    }
+    const me = identity?.name?.trim();
+    if (me && me.length > 0) {
+      return { players: [me], limit: 50, mode: "contains" };
+    }
+    return { limit: 50 };
+  }
+
   async function fetchHistory() {
     try {
-      const response = await fetch("/api/history");
+      const filter = getHistoryFilter();
+      const params = new URLSearchParams();
+      if (filter.players && filter.players.length > 0) {
+        // Support API contract: players=comma,separated OR repeated param; we'll use comma-separated
+        params.set("players", filter.players.join(","));
+      }
+      if (filter.limit) params.set("limit", String(filter.limit));
+      if (filter.mode) params.set("mode", filter.mode);
+      const base = apiBaseUrl ?? "";
+      const url = `${base}/api/history${params.toString() ? `?${params.toString()}` : ""}`;
+      const response = await fetch(url);
       if (!response.ok) return;
       const data = (await response.json()) as { history: HistoryEntry[] };
       setHistory(data.history);
@@ -312,8 +346,7 @@ export default function App() {
   function handleReset() {
     // Reset game state on server
     socketRef.current?.emit("reset");
-    // Reset player session for new game
-    resetSession();
+    // Do NOT reset the local session; keep roles and names for quick rematch
   }
 
   function handleShowHistory() {
@@ -326,9 +359,23 @@ export default function App() {
 
   function handleRefreshHistory() {
     fetchHistory().catch(() => {
-      socketRef.current?.emit("request-history");
+      const filter = getHistoryFilter();
+      socketRef.current?.emit("request-history", filter);
     });
   }
+
+  // On identity/players change, proactively request filtered history once
+  const lastHistoryKeyRef = useRef<string>("");
+  useEffect(() => {
+    const filter = getHistoryFilter();
+    const key = JSON.stringify(filter);
+    if (key === lastHistoryKeyRef.current) return;
+    lastHistoryKeyRef.current = key;
+    // Try fetch first; if it fails, fall back to socket
+    fetchHistory().catch(() => {
+      socketRef.current?.emit("request-history", filter);
+    });
+  }, [identity?.name, gameState?.playerNames?.[0], gameState?.playerNames?.[1]]);
 
   const opponentIndex =
     playerIndex !== null ? ((playerIndex === 0 ? 1 : 0) as PlayerIndex) : null;
@@ -379,35 +426,45 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {identity && (
-        <div
-          style={{
-            position: "fixed",
-            top: 24,
-            right: 24,
-            display: "flex",
-            gap: "8px",
-            zIndex: 60,
-          }}
+      <div
+        style={{
+          position: "fixed",
+          top: 24,
+          right: 24,
+          display: "flex",
+          gap: "8px",
+          zIndex: 60,
+        }}
+      >
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => setIsHelpOpen(true)}
+          title="Hilfe anzeigen"
         >
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={openModal}
-            title="Rolle wechseln"
-          >
-            {ROLE_LABELS[identity.role]} - {identity.name}
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={releaseRole}
-            title="Reservierung aufheben"
-          >
-            Abmelden
-          </button>
-        </div>
-      )}
+          Hilfe
+        </button>
+        {identity && (
+          <>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={openModal}
+              title="Rolle wechseln"
+            >
+              {ROLE_LABELS[identity.role]} - {identity.name}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={releaseRole}
+              title="Reservierung aufheben"
+            >
+              Abmelden
+            </button>
+          </>
+        )}
+      </div>
       <RoleSelectModal
         isOpen={isModalOpen}
         status={roomStatus}
@@ -428,6 +485,10 @@ export default function App() {
       )}
 
       {notification && <div className="toast">{notification}</div>}
+
+      {isHelpOpen && (
+        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      )}
 
       {/* Don't show any UI while session is being restored */}
       {sessionState === "loading" || sessionState === "restoring" ? (

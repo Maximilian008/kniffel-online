@@ -11,6 +11,7 @@ import {
   deriveWinner,
   initDb,
   listHistory,
+  listHistoryFiltered,
   loadGame,
   saveGame,
   toPersistedGame,
@@ -25,6 +26,7 @@ import type {
 } from "./types/shared.js";
 import { MAX_ROLLS_PER_TURN } from "./types/shared.js";
 import { rollDice, scoreCategory } from "./utils/gameRules.js";
+import { normaliseName } from "./utils/names.js";
 
 dotenv.config();
 initDb();
@@ -199,9 +201,23 @@ app.get("/health", (_req, res) => {
   res.json(buildHealthPayload());
 });
 
-app.get("/api/history", (_req, res) => {
+app.get("/api/history", (req, res) => {
   try {
-    const history: HistoryEntry[] = listHistory(100);
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const rawPlayers = (req.query.players ?? req.query.player ?? req.query.p) as
+      | string
+      | string[]
+      | undefined;
+    const players: string[] = Array.isArray(rawPlayers)
+      ? rawPlayers
+      : typeof rawPlayers === "string" && rawPlayers.trim().length > 0
+        ? rawPlayers.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+    const mode = (req.query.mode as string | undefined) === "contains" ? "contains" : "exact";
+
+    const history: HistoryEntry[] = players.length > 0 || limit !== undefined || mode
+      ? listHistoryFiltered({ limit, players, mode })
+      : listHistory(100);
     res.json({ history });
   } catch (error) {
     log("error", "Failed to load history", error);
@@ -651,9 +667,14 @@ function registerGameEventHandlers(socket: Socket) {
     });
   });
 
-  socket.on("request-history", () => {
+  socket.on("request-history", (payload?: { players?: string[]; limit?: number; mode?: "exact" | "contains" }) => {
     try {
-      const history = listHistory(50);
+      const limit = payload?.limit;
+      const players = payload?.players ?? [];
+      const mode = payload?.mode === "contains" ? "contains" : "exact";
+      const history = (players.length > 0 || limit !== undefined)
+        ? listHistoryFiltered({ limit, players, mode })
+        : listHistory(50);
       socket.emit("history", history);
     } catch (error) {
       log("error", "Failed to deliver history", error);
@@ -715,28 +736,44 @@ function resetRoom(room: GameRoom) {
 
 function persistRoom(room: GameRoom) {
   const serializedState = serializeState(room.state);
-  const gameId = room.state.phase === "finished"
-    ? `${room.id}-finished-${Date.now()}`  // Eindeutige ID für abgeschlossene Spiele
-    : room.id;  // Normale ID für laufende Spiele
+  const isFinished = room.state.phase === "finished";
 
+  // Verwende eine stabile ID für abgeschlossene Spiele, damit spätere Persist-Aufrufe
+  // (z. B. Disconnect/Release) den gleichen Datensatz aktualisieren statt Duplikate zu erzeugen.
+  // Stabil: createdAt dient als eindeutiger Marker einer Partie.
+  const gameId = isFinished
+    ? `${room.id}-finished-${room.createdAt}`
+    : room.id;
+
+  const now = Date.now();
   const persistedGame = toPersistedGame({
     roomId: gameId,
     playerTokens: room.tokens,
     state: serializedState,
     createdAt: room.createdAt,
-    updatedAt: Date.now(),
+    updatedAt: now,
   });
 
-  // Bei abgeschlossenen Spielen, setze finishedAt und berechne finale Scores
-  if (room.state.phase === "finished") {
+  if (isFinished) {
     const scores = deriveScores(serializedState);
     const winner = deriveWinner(serializedState, scores);
-    persistedGame.finishedAt = Date.now();
+    persistedGame.finishedAt = now;
     persistedGame.scores = scores;
     persistedGame.winner = winner;
   }
 
   saveGame(persistedGame);
+
+  // Nach Abschluss sofort aktualisierte History an alle im Raum senden,
+  // damit die UI ohne manuellen Refresh die neue Partie sieht.
+  if (isFinished) {
+    try {
+      const history = listHistory(50);
+      io.to(room.id).emit("history", history);
+    } catch (error) {
+      log("warn", "Failed to emit updated history after finish", error);
+    }
+  }
 }
 
 function createInitialState(): GameState {
@@ -825,9 +862,7 @@ function sendDenied(socket: Socket, message: string) {
   socket.emit("action-denied", { message });
 }
 
-function normaliseName(value: string): string {
-  return value.trim().replace(/\s+/g, " ").slice(0, 40);
-}
+// moved to utils/names.ts
 
 function buildHealthPayload() {
   return {

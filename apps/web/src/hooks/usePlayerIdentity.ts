@@ -246,8 +246,8 @@ function readPlayerSession(): PlayerSession | null {
     if (!raw) return null;
     const session = JSON.parse(raw) as PlayerSession;
 
-    // Check if session is not too old (24 hours)
-    if (Date.now() - session.timestamp > 24 * 60 * 60 * 1000) {
+    // Check if session is not too old (30 days)
+    if (Date.now() - session.timestamp > 30 * 24 * 60 * 60 * 1000) {
       clearPlayerSession();
       return null;
     }

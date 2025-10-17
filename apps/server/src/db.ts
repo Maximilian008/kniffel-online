@@ -6,8 +6,13 @@ import type {
   ScoreSheet,
   SerializedGameState,
 } from "./types/shared.js";
+import { normaliseName } from "./utils/names.js";
 
-const DATA_DIR = path.resolve(process.cwd(), "data");
+// Allow overriding data directory via environment variable for production deployments
+// e.g. on Railway: mount a Volume at /data and set DATA_DIR=/data
+const DATA_DIR = process.env.DATA_DIR && process.env.DATA_DIR.trim().length > 0
+  ? path.resolve(process.env.DATA_DIR)
+  : path.resolve(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "kniffel.json");
 const TEMP_PATH = `${DB_PATH}.tmp`;
 
@@ -91,6 +96,64 @@ export function listHistory(limit = 50): HistoryEntry[] {
       record,
       finishedAt: record.finishedAt ?? record.updatedAt,
     }))
+    .sort((a, b) => b.finishedAt - a.finishedAt)
+    .slice(0, limit);
+
+  return finished.map(({ record, finishedAt }) => {
+    const scores = record.scores ?? deriveScores(record.state);
+    const winner = record.winner ?? deriveWinner(record.state, scores);
+    return {
+      id: record.roomId,
+      createdAt: record.createdAt,
+      finishedAt,
+      playerNames: record.state.playerNames,
+      scores,
+      winner,
+      scoreSheets: record.state.scoreSheets,
+    } satisfies HistoryEntry;
+  });
+}
+
+type HistoryFilterMode = "exact" | "contains";
+
+function normalizeKey(value: string): string {
+  return normaliseName(value).toLowerCase();
+}
+
+function makeParticipants(names: [string, string]): [string, string] {
+  const a = normalizeKey(names[0] ?? "");
+  const b = normalizeKey(names[1] ?? "");
+  return [a, b].sort() as [string, string];
+}
+
+export function listHistoryFiltered(options?: {
+  limit?: number;
+  players?: string[];
+  mode?: HistoryFilterMode;
+}): HistoryEntry[] {
+  ensureLoaded();
+  const limit = Math.max(1, Math.min(200, options?.limit ?? 50));
+  const mode: HistoryFilterMode = options?.mode === "contains" ? "contains" : "exact";
+  const players = (options?.players ?? []).map((p) => normalizeKey(p)).filter(Boolean);
+
+  const records = Array.from(games.values());
+  const finished = records
+    .filter((record) => record.finishedAt !== null || record.state.phase === "finished")
+    .map((record) => ({
+      record,
+      finishedAt: record.finishedAt ?? record.updatedAt,
+      participants: makeParticipants(record.state.playerNames),
+    }))
+    .filter(({ participants }) => {
+      if (players.length === 0) return true;
+      const set = new Set(participants);
+      if (mode === "contains") {
+        // Match if any provided player is among the participants
+        return players.some((p) => set.has(p));
+      }
+      // exact: all provided names must be present among the two participants
+      return players.every((p) => set.has(p));
+    })
     .sort((a, b) => b.finishedAt - a.finishedAt)
     .slice(0, limit);
 

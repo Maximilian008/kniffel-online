@@ -151,7 +151,7 @@ export default function GameScreen({
           </div>
           <div className="dice-main-area">
             <div className="dice-row">
-              {state.dice.map((value, index) => (
+              {state.dice.map((value: number, index: number) => (
                 <Dice
                   key={index}
                   value={value}
