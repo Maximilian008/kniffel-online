@@ -9,13 +9,13 @@ import type {
 import { scoreAllCategories } from "./utils/gameRules";
 
 import GameScreen from "./components/GameScreen";
+import HelpModal from "./components/HelpModal";
 import HistoryPanel from "./components/HistoryPanel";
 import ResultScreen from "./components/ResultScreen";
 import RoleSelectModal from "./components/RoleSelectModal";
 import SetupScreen from "./components/SetupScreen";
-import HelpModal from "./components/HelpModal";
 import { usePlayerIdentity } from "./hooks/usePlayerIdentity";
-import { createSocket, ROLE_LABELS, type AppSocket, type OpponentStatusPayload } from "./lib/socket";
+import { createSocket, ROLE_LABELS, type AppSocket, type OpponentStatusPayload, type RoomRole } from "./lib/socket";
 
 const HISTORY_CACHE_KEY = "kniffel-history-cache";
 
@@ -41,7 +41,7 @@ const LOWER_CATEGORIES: Category[] = [
 type ConnectionPhase = "connecting" | "waiting" | "matched";
 
 function defaultName(index: PlayerIndex) {
-  return index === 0 ? "Player 1" : "Player 2";
+  return `Player ${index + 1}`;
 }
 
 function calculateFinalScore(sheet: Record<Category, number | undefined>) {
@@ -82,6 +82,7 @@ export default function App() {
   const [connectionPhase, setConnectionPhase] = useState<ConnectionPhase>("connecting");
   const [gameState, setGameState] = useState<SerializedGameState | null>(null);
   const [opponentConnected, setOpponentConnected] = useState(false);
+  const [playerStatuses, setPlayerStatuses] = useState<Array<{ connected: boolean; ready: boolean }>>([]);
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistoryCache);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [localNameDraft, setLocalNameDraft] = useState("");
@@ -89,6 +90,7 @@ export default function App() {
   const [notification, setNotification] = useState<string | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [playerCount, setPlayerCount] = useState<number>(2);
 
   // Resolve server base URLs for sockets and API
   const { socketUrl, apiBaseUrl } = useMemo(() => {
@@ -173,8 +175,8 @@ export default function App() {
     suggestedName,
   } = identityApi;
 
-  const playerIndex = identity ? (identity.role === "p1" ? 0 : 1) : null;
-  const playerNumber = playerIndex !== null ? ((playerIndex + 1) as 1 | 2) : null;
+  const playerIndex = identity ? (Number(identity.role.slice(1)) - 1 || 0) : null;
+  const playerNumber = playerIndex !== null ? playerIndex : null;
 
   // Update connection phase based on session state and socket status
   useEffect(() => {
@@ -226,13 +228,28 @@ export default function App() {
   useEffect(() => {
     if (!identity) {
       setOpponentConnected(false);
+      setPlayerStatuses([]);
       return;
     }
     if (!roomStatus) return;
     const opponentRole = identity.role === "p1" ? "p2" : "p1";
     const opponentSlot = roomStatus.roles[opponentRole];
     setOpponentConnected(Boolean(opponentSlot?.connected));
-  }, [roomStatus, identity]);
+    // Build per-player statuses from roles + ready state
+    const n = Math.max(2, Math.min(6, roomStatus.capacity || 2));
+    const statuses: Array<{ connected: boolean; ready: boolean }> = Array.from({ length: n }, (_, i) => {
+      const role = (`p${i + 1}`) as keyof typeof roomStatus.roles;
+      const s = roomStatus.roles[role];
+      const connected = Boolean(s?.connected);
+      const ready = Boolean(gameState?.ready?.[i]);
+      return { connected, ready };
+    });
+    setPlayerStatuses(statuses);
+    // Sync capacity to local playerCount for UI
+    if (typeof roomStatus.capacity === "number" && roomStatus.capacity >= 2 && roomStatus.capacity <= 6) {
+      setPlayerCount(roomStatus.capacity);
+    }
+  }, [roomStatus, identity, gameState?.ready]);
 
   useEffect(() => {
     if (!historyOpen) return;
@@ -244,12 +261,9 @@ export default function App() {
 
   // Build history filter based on current identity and known player names
   function getHistoryFilter(): { players?: string[]; limit?: number; mode?: "exact" | "contains" } {
-    const pNames = gameState?.playerNames ?? ["", ""];
-    const a = (pNames[0] ?? "").trim();
-    const b = (pNames[1] ?? "").trim();
-    const knownBoth = a.length > 0 && b.length > 0;
-    if (knownBoth) {
-      return { players: [a, b], limit: 50, mode: "exact" };
+    const pNames = (gameState?.playerNames ?? []).map((n) => (n ?? "").trim()).filter(Boolean);
+    if (pNames.length >= 2) {
+      return { players: pNames, limit: 50, mode: "exact" };
     }
     const me = identity?.name?.trim();
     if (me && me.length > 0) {
@@ -377,41 +391,28 @@ export default function App() {
     });
   }, [identity?.name, gameState?.playerNames?.[0], gameState?.playerNames?.[1]]);
 
-  const opponentIndex =
-    playerIndex !== null ? ((playerIndex === 0 ? 1 : 0) as PlayerIndex) : null;
-  const displayNames: [string, string] = [
-    gameState?.playerNames[0] || defaultName(0),
-    gameState?.playerNames[1] || defaultName(1),
-  ];
+  const displayNames: string[] = gameState?.playerNames?.length
+    ? gameState.playerNames.map((n, i) => n || defaultName(i))
+    : [defaultName(0), defaultName(1)];
 
-  const opponentName = opponentIndex !== null ? displayNames[opponentIndex] : "Opponent";
+  const localReady = playerIndex !== null && gameState?.ready ? Boolean(gameState.ready[playerIndex]) : false;
 
-  const localReady =
-    playerIndex !== null && gameState?.ready ? gameState.ready[playerIndex] : false;
+  const effectiveConnectionPhase: ConnectionPhase = connectionPhase;
 
-  const opponentReady =
-    opponentIndex !== null && gameState?.ready ? gameState.ready[opponentIndex] : false;
-
-  const effectiveConnectionPhase: ConnectionPhase =
-    connectionPhase === "matched" && !opponentConnected ? "waiting" : connectionPhase;
-
-  const finalScores: [number, number] | null = gameState
-    ? [
-      calculateFinalScore(gameState.scoreSheets[0] as Record<Category, number | undefined>),
-      calculateFinalScore(gameState.scoreSheets[1] as Record<Category, number | undefined>),
-    ]
+  const finalScores: number[] | null = gameState
+    ? gameState.scoreSheets.map((s) => calculateFinalScore(s as Record<Category, number | undefined>))
     : null;
 
   const winner = useMemo(() => {
     if (!gameState || gameState.phase !== "finished" || !finalScores) return "";
-    if (finalScores[0] > finalScores[1]) return gameState.playerNames[0] || defaultName(0);
-    if (finalScores[1] > finalScores[0]) return gameState.playerNames[1] || defaultName(1);
-    return "Draw";
+    const max = Math.max(...finalScores);
+    const winners = finalScores.map((v, i) => (v === max ? (gameState.playerNames[i] || defaultName(i)) : null)).filter(Boolean) as string[];
+    return winners.length === 1 ? winners[0]! : "Draw";
   }, [finalScores, gameState]);
 
   const isCurrentPlayer = Boolean(
     gameState &&
-    playerNumber &&
+    playerNumber !== null &&
     gameState.phase === "playing" &&
     gameState.currentPlayer === playerNumber
   );
@@ -423,6 +424,31 @@ export default function App() {
 
   const startDisabled =
     !identity || !localNameValid || effectiveConnectionPhase !== "matched" || playerIndex === null;
+
+  // Emit capacity changes during setup to server (no-op during playing/finished)
+  useEffect(() => {
+    if (!socketRef.current) return;
+    if (!gameState || gameState.phase !== "setup") return;
+    socketRef.current.emit("room:setCapacity", { capacity: playerCount });
+  }, [playerCount, gameState?.phase]);
+
+  // Build players list for SetupScreen (names + online + ready)
+  function getSetupPlayers(): Array<{ name: string; connected: boolean; ready: boolean; isSelf?: boolean }> | undefined {
+    const cap = roomStatus?.capacity ?? 2;
+    const names: string[] = (gameState?.playerNames ?? Array.from({ length: cap }, (_, i) => defaultName(i)))
+      .map((n, i) => (n && n.trim().length > 0 ? n.trim() : defaultName(i)));
+    if (!roomStatus) {
+      // Without room status, we can't show connection state; omit list to keep fallback UI
+      return undefined;
+    }
+    return names.map((name, i) => {
+      const roleKey = (`p${i + 1}`) as RoomRole;
+      const connected = Boolean(roomStatus.roles?.[roleKey]?.connected);
+      const ready = Boolean(gameState?.ready?.[i]);
+      const isSelf = identity ? (i === (Number(identity.role.slice(1)) - 1 || 0)) : false;
+      return { name: name || defaultName(i), connected, ready, isSelf };
+    });
+  }
 
   return (
     <div className="app-shell">
@@ -509,9 +535,11 @@ export default function App() {
               onOpenHistory={handleShowHistory}
               canEdit={canEditName}
               opponentConnected={opponentConnected}
-              opponentReady={opponentReady}
               localReady={localReady}
               startDisabled={startDisabled}
+              playerCount={playerCount}
+              onPlayerCountChange={setPlayerCount}
+              players={getSetupPlayers()}
             />
           )}
 
@@ -527,10 +555,12 @@ export default function App() {
               onOpenHistory={handleShowHistory}
               canEdit={canEditName}
               opponentConnected={opponentConnected}
-              opponentReady={opponentReady}
+              opponentReady={false}
               localReady={localReady}
               startDisabled={startDisabled}
-              opponentName={opponentName}
+              playerCount={playerCount}
+              onPlayerCountChange={setPlayerCount}
+              players={getSetupPlayers()}
             />
           )}
 
@@ -547,14 +577,14 @@ export default function App() {
               onChooseCategory={handleChoose}
               onReset={handleReset}
               onOpenHistory={handleShowHistory}
-              opponentConnected={opponentConnected}
+              playerStatuses={playerStatuses}
             />
           )}
 
           {gameState && gameState.phase === "finished" && (
             <ResultScreen
               state={gameState}
-              scores={finalScores ?? [0, 0]}
+              scores={finalScores ?? []}
               winner={winner}
               onReset={handleReset}
               onOpenHistory={handleShowHistory}

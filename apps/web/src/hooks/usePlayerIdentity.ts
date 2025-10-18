@@ -72,6 +72,12 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
 
     const session = sessionRef.current;
     const slot = roomStatus.roles[session.role];
+    if (!slot) {
+      setSessionState("conflict");
+      setModalOpen(true);
+      setSuggestedName(session.name);
+      return;
+    }
 
     // Check if slot is available or occupied by us
     if (!slot.occupied || (slot.name && equalsIgnoreCase(slot.name, session.name))) {

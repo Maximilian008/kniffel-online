@@ -1,4 +1,4 @@
-﻿import type { Dice, Die, Category } from "./types.js";
+﻿import type { Category, Dice, Die } from "./types.js";
 
 // Utility helpers
 const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);

@@ -2,14 +2,18 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "composite": true,
-
     "target": "ES2023",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-
-    "types": ["vite/client"],
+    "types": [
+      "vite/client"
+    ],
     "skipLibCheck": true,
     "noEmit": true,
     "isolatedModules": true,
@@ -17,24 +21,35 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
-  "allowJs": true,
-
+    "allowJs": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-
     "baseUrl": ".",
     "paths": {
-      "@game/rules": ["../../packages/game-rules/src"],
-      "@shared/lib": ["../../packages/shared/dist/index.d.ts", "../../packages/shared/src/index.ts"]
+      "@game/rules": [
+        "../../packages/game-rules/src"
+      ],
+      "@shared/lib": [
+        "../../packages/shared/dist/index.d.ts",
+        "../../packages/shared/src/index.ts"
+      ]
     }
   },
-  "include": ["src", "vite.config.ts", "vite-env.d.ts"],
+  "include": [
+    "src",
+    "vite.config.ts",
+    "vite-env.d.ts"
+  ],
   "references": [
-    { "path": "../../packages/game-rules" },
-    { "path": "../../packages/shared" }
+    {
+      "path": "../../packages/game-rules"
+    },
+    {
+      "path": "../../packages/shared"
+    }
   ]
 }

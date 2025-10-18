@@ -13,7 +13,7 @@ import SoundToggle from "./SoundToggle";
 type Props = {
   state: SerializedGameState;
   playerIndex: PlayerIndex;
-  names: [string, string];
+  names: string[];
   isCurrentPlayer: boolean;
   isRolling: boolean;
   previewScores: Record<Category, number> | null;
@@ -22,7 +22,7 @@ type Props = {
   onChooseCategory: (category: Category) => void;
   onReset: () => void;
   onOpenHistory: () => void;
-  opponentConnected: boolean;
+  playerStatuses: Array<{ connected: boolean; ready: boolean }>;
 };
 
 export default function GameScreen({
@@ -37,7 +37,7 @@ export default function GameScreen({
   onChooseCategory,
   onReset,
   onOpenHistory,
-  opponentConnected
+  playerStatuses
 }: Props) {
   const rollsLeft = state.rollsLeft;
   const readyToRoll = isCurrentPlayer && rollsLeft >= 0 && !isRolling;
@@ -96,25 +96,44 @@ export default function GameScreen({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isCurrentPlayer, readyToRoll, rollsLeft, onRoll, onToggleHold, onOpenHistory, onReset]);
-  const opponentIndex: PlayerIndex = playerIndex === 0 ? 1 : 0;
-  const localName = names[playerIndex] || (playerIndex === 0 ? "Player 1" : "Player 2");
-  const opponentName = names[opponentIndex] || (opponentIndex === 0 ? "Player 1" : "Player 2");
+  // Header below shows all players dynamically; no need for derived local/opponent names here
 
   // Status message not needed in header anymore
 
   return (
     <div className="panel game-screen">
       <header className="game-header">
-        <div className={`player-tag self ${isCurrentPlayer ? 'active' : ''}`}>
-          <span className="label">Du</span>
-          <strong>{localName}</strong>
-          {isCurrentPlayer && <span className="turn-indicator">🎯 Dein Zug</span>}
+        <div className="players-list" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {names.map((n, i) => {
+            const mine = i === playerIndex;
+            const active = state.currentPlayer === i;
+            const status = playerStatuses[i] ?? { connected: false, ready: false };
+            return (
+              <div key={i} className={`player-tag ${mine ? 'self' : 'opponent'} ${active ? 'active' : ''}`}>
+                {mine ? <span className="label">Du</span> : <span className="label">Spieler {i + 1}</span>}
+                <strong>{n || `Player ${i + 1}`}</strong>
+                <div className="player-substatus">
+                  <span
+                    className={`conn-dot ${status.connected ? 'online' : 'offline'}`}
+                    title={status.connected ? 'Online' : 'Offline'}
+                  />
+                  {state.phase === 'setup' && (
+                    <span className={`ready-badge ${status.ready ? 'ready' : 'not-ready'}`}>
+                      {status.ready ? 'Bereit' : 'Nicht bereit'}
+                    </span>
+                  )}
+                </div>
+                {active && (
+                  <span className="turn-indicator">🎯 {mine ? 'Dein Zug' : 'Am Zug'}</span>
+                )}
+              </div>
+            );
+          })}
         </div>
         <div className="game-status">
           <div className="status-content">
             <p className="status-message">{getGermanStatusMessage({
               isCurrentPlayer,
-              opponentConnected,
               rollsLeft,
               phase: state.phase,
               names,
@@ -126,17 +145,6 @@ export default function GameScreen({
               </span>
             </div>
           </div>
-          <div className={`connection-status ${opponentConnected ? "online" : "offline"}`}>
-            <span className="connection-dot"></span>
-            <span className="connection-text">
-              {opponentConnected ? "Gegner online" : "Gegner offline"}
-            </span>
-          </div>
-        </div>
-        <div className={`player-tag opponent ${!isCurrentPlayer ? 'active' : ''}`}>
-          <span className="label">Gegner</span>
-          <strong>{opponentName}</strong>
-          {!isCurrentPlayer && <span className="turn-indicator">🎯 Gegner am Zug</span>}
         </div>
       </header>
 
@@ -243,8 +251,7 @@ export default function GameScreen({
 
       <Scoreboard
         state={state}
-        playerNameA={names[0] || "Player 1"}
-        playerNameB={names[1] || "Player 2"}
+        playerNames={names}
         activeIndex={playerIndex}
         isCurrentPlayer={isCurrentPlayer}
         previewScores={previewScores}
@@ -256,25 +263,21 @@ export default function GameScreen({
 
 type StatusArgs = {
   isCurrentPlayer: boolean;
-  opponentConnected: boolean;
   rollsLeft: number;
   phase: SerializedGameState["phase"];
-  names: [string, string];
-  currentPlayer: 1 | 2;
+  names: string[];
+  currentPlayer: number;
 };
 
 function getGermanStatusMessage(args: StatusArgs) {
-  if (!args.opponentConnected) {
-    return "Warte auf Wiedereintritt des Gegners.";
-  }
   if (args.phase !== "playing") {
     return "Bereite das Spiel vor...";
   }
   if (args.isCurrentPlayer) {
     return `Du bist dran. ${args.rollsLeft} Wurf${args.rollsLeft === 1 ? "" : "e"} übrig.`;
   }
-  const index = args.currentPlayer - 1;
-  const fallback = index === 0 ? "Spieler 1" : "Spieler 2";
+  const index = args.currentPlayer;
+  const fallback = `Spieler ${index + 1}`;
   const name = args.names[index] || fallback;
   return `${name} ist am Zug.`;
 }

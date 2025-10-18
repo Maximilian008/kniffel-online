@@ -1,11 +1,11 @@
 ﻿import type { SerializedGameState } from "../types/shared";
 import Scoreboard from "./Scoreboard";
 
-const DEFAULT_NAMES: [string, string] = ["Player 1", "Player 2"];
+const DEFAULT_NAME = (i: number) => `Player ${i + 1}`;
 
 type Props = {
   state: SerializedGameState;
-  scores: [number, number];
+  scores: number[];
   winner: string;
   onReset: () => void;
   onOpenHistory: () => void;
@@ -18,15 +18,11 @@ export default function ResultScreen({
   onReset,
   onOpenHistory,
 }: Props) {
-  const names: [string, string] = [
-    state.playerNames[0] || DEFAULT_NAMES[0],
-    state.playerNames[1] || DEFAULT_NAMES[1],
-  ];
-
+  const names = state.playerNames.map((n, i) => n || DEFAULT_NAME(i));
   const title = winner === "Draw" ? "🤝 Unentschieden!" : `🎉 ${winner} gewinnt!`;
   const resultMessage = winner === "Draw"
-    ? `Beide Spieler haben ${scores[0]} Punkte erreicht!`
-    : `${names[0]} erreichte ${scores[0]} Punkte, ${names[1]} erreichte ${scores[1]} Punkte.`;
+    ? `Unentschieden mit ${scores[0] ?? 0} Punkten.`
+    : names.map((n, i) => `${n}: ${scores[i] ?? 0}`).join(" · ");
 
   return (
     <div className="panel result-screen">
@@ -50,8 +46,7 @@ export default function ResultScreen({
 
       <Scoreboard
         state={state}
-        playerNameA={names[0]}
-        playerNameB={names[1]}
+        playerNames={names}
         activeIndex={undefined}
         isCurrentPlayer={false}
         previewScores={null}

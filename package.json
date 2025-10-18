@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "prestart": "pnpm -w build",
     "build": "pnpm run build:packages && pnpm --filter web build && pnpm --filter server build",
     "start": "pnpm --filter server start",
     "dev:server": "pnpm --filter server dev",
