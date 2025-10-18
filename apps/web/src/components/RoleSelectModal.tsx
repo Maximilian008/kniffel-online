@@ -21,7 +21,10 @@ type RoleEntry = {
   isReservedForYou: boolean;
 };
 
-const ROLES: RoomRole[] = ["p1", "p2"];
+function getRoles(capacity: number): RoomRole[] {
+  const n = Math.max(2, Math.min(6, capacity || 2));
+  return Array.from({ length: n }, (_, i) => `p${i + 1}` as RoomRole);
+}
 const MAX_LENGTH = 40;
 
 export default function RoleSelectModal({
@@ -52,7 +55,8 @@ export default function RoleSelectModal({
   const lowerTrimmed = trimmed.toLowerCase();
 
   const roleEntries = useMemo<RoleEntry[]>(() => {
-    return ROLES.map((role) => {
+    const roles = getRoles(status?.capacity ?? 2);
+    return roles.map((role) => {
       const slot = status?.roles[role];
       if (!slot) {
         return {
@@ -120,6 +124,11 @@ export default function RoleSelectModal({
           Reserviere eine Rolle und gib deinen Anzeigenamen ein. Wenn du bereits gespielt hast,
           waehle dieselbe Kombination, um sofort wieder einzusteigen.
         </p>
+        {status && (
+          <p className="modal-hint" style={{ marginTop: 4, marginBottom: 8, color: '#666' }}>
+            Spielerzahl: <strong>{Math.max(2, Math.min(6, status.capacity || 2))}</strong>
+          </p>
+        )}
 
         <label className="modal-label" htmlFor="player-name-input">
           Anzeigename
@@ -138,7 +147,17 @@ export default function RoleSelectModal({
         />
         {error && <p className="modal-error">{error}</p>}
 
-        <div className="role-grid">
+        <div
+          className="role-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 12,
+            maxHeight: 320,
+            overflowY: 'auto',
+            paddingRight: 4,
+          }}
+        >
           {roleEntries.map((entry) => {
             const claiming = isClaiming === entry.role;
             return (

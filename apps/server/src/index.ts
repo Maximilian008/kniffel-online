@@ -106,12 +106,21 @@ function readPackageVersion(): string {
   }
   return process.env.npm_package_version ?? '0.0.0';
 }
-type Role = "p1" | "p2";
-const ROLES: Role[] = ["p1", "p2"];
+type Role = "p1" | "p2" | "p3" | "p4" | "p5" | "p6";
+const ROLES: Role[] = ["p1", "p2", "p3", "p4", "p5", "p6"];
+
+function indexFromRole(role: Role): number {
+  return Number(role.slice(1)) - 1;
+}
+
+function roleByIndex(index: number): Role {
+  const n = Math.max(0, Math.min(5, index));
+  return ROLES[n];
+}
 
 type PlayerSlot = {
   role: Role;
-  index: 0 | 1;
+  index: number;
   name: string;
   socketId: string | null;
   connected: boolean;
@@ -129,7 +138,8 @@ type RoomStatusPayloadRole = {
 
 type RoomStatusPayload = {
   roomId: string;
-  roles: Record<Role, RoomStatusPayloadRole>;
+  capacity: number;
+  roles: Partial<Record<Role, RoomStatusPayloadRole>>;
 };
 
 type RoleClaimPayload = {
@@ -145,7 +155,8 @@ type GameRoom = {
   id: string;
   state: GameState;
   createdAt: number;
-  players: Record<Role, PlayerSlot>;
+  capacity: number;
+  players: Partial<Record<Role, PlayerSlot>>;
   tokens: [string, string];
 };
 
@@ -357,6 +368,10 @@ function handleRoleClaim(socket: Socket, role?: Role, rawName?: string) {
   }
 
   const slot = room.players[role];
+  if (!slot) {
+    socket.emit("room:roleDenied", { reason: "Ungueltige Rolle." });
+    return;
+  }
   const requestedKey = normalizedName.toLowerCase();
   const existingKey = slot.name.trim().toLowerCase();
 
@@ -417,7 +432,7 @@ function handleRoleRelease(socket: Socket) {
   }
 
   const slot = room.players[assignment.role];
-  if (slot.socketId !== socket.id) {
+  if (!slot || slot.socketId !== socket.id) {
     socketAssignments.delete(socket.id);
     return;
   }
@@ -439,7 +454,7 @@ function handleDisconnect(socket: Socket) {
   if (!room) return;
 
   const slot = room.players[assignment.role];
-  if (slot.socketId !== socket.id) return;
+  if (!slot || slot.socketId !== socket.id) return;
 
   slot.socketId = null;
   slot.connected = false;
@@ -460,6 +475,7 @@ function handleDisconnect(socket: Socket) {
 
 function releaseSlot(room: GameRoom, role: Role, options: RoleReleaseOptions = {}) {
   const slot = room.players[role];
+  if (!slot) return;
   clearReleaseTimer(slot);
 
   if (slot.socketId) {
@@ -492,11 +508,13 @@ function clearReleaseTimer(slot: PlayerSlot) {
 }
 
 function buildRoomStatus(room: GameRoom): RoomStatusPayload {
-  const roles: Record<Role, RoomStatusPayloadRole> = {
-    p1: buildRoleStatus(room.players.p1),
-    p2: buildRoleStatus(room.players.p2),
-  };
-  return { roomId: room.id, roles };
+  const roles: Partial<Record<Role, RoomStatusPayloadRole>> = {};
+  for (let i = 0; i < room.capacity; i += 1) {
+    const role = roleByIndex(i);
+    const slot = room.players[role];
+    if (slot) roles[role] = buildRoleStatus(slot);
+  }
+  return { roomId: room.id, capacity: room.capacity, roles };
 }
 
 function buildRoleStatus(slot: PlayerSlot): RoomStatusPayloadRole {
@@ -521,31 +539,69 @@ function broadcastState(room: GameRoom) {
 }
 
 function notifyConnectionStatus(room: GameRoom) {
-  const p1Socket = room.players.p1.socketId
-    ? io.sockets.sockets.get(room.players.p1.socketId)
-    : null;
-  const p2Socket = room.players.p2.socketId
-    ? io.sockets.sockets.get(room.players.p2.socketId)
-    : null;
-
-  if (p1Socket) {
-    p1Socket.emit("opponent-status", {
-      connected: room.players.p2.connected,
-    });
-  }
-  if (p2Socket) {
-    p2Socket.emit("opponent-status", {
-      connected: room.players.p1.connected,
-    });
+  for (let i = 0; i < room.capacity; i += 1) {
+    const me = room.players[roleByIndex(i)];
+    if (!me?.socketId) continue;
+    const anyOther = (() => {
+      for (let j = 0; j < room.capacity; j += 1) {
+        if (i === j) continue;
+        if (room.players[roleByIndex(j)]?.connected) return true;
+      }
+      return false;
+    })();
+    const sock = io.sockets.sockets.get(me.socketId);
+    sock?.emit("opponent-status", { connected: anyOther });
   }
 }
 
 function registerGameEventHandlers(socket: Socket) {
+  socket.on("room:setCapacity", (payload?: { capacity?: number }) => {
+    const requested = typeof payload?.capacity === "number" ? Math.floor(payload.capacity) : NaN;
+    withPlayerContext(socket, ({ room }) => {
+      // Only allow changing capacity during setup
+      if (room.state.phase !== "setup") return;
+      const next = Number.isFinite(requested) ? Math.max(2, Math.min(6, requested)) : 2;
+      if (room.capacity === next) return;
+      const prev = room.capacity;
+      room.capacity = next;
+
+      // Create any missing slots when increasing capacity
+      if (next > prev) {
+        for (let i = prev; i < next; i += 1) {
+          const role = roleByIndex(i);
+          if (!room.players[role]) {
+            room.players[role] = createSlot(role, i, room.state.playerNames[i]);
+          }
+        }
+      } else if (next < prev) {
+        // Release and remove slots beyond new capacity
+        for (let i = next; i < prev; i += 1) {
+          const role = roleByIndex(i);
+          if (room.players[role]) {
+            releaseSlot(room, role, { notify: true });
+            delete room.players[role];
+          }
+        }
+      }
+
+      // Resize state arrays to match new capacity (preserve names/sheets as possible)
+      room.state.playerNames = padArray(room.state.playerNames, next, "");
+      room.state.ready = padArray(room.state.ready, next, false);
+      room.state.scoreSheets = padArray(room.state.scoreSheets, next, {} as any);
+      room.state.usedCategories = padArray(room.state.usedCategories, next, new Set<Category>());
+
+      persistRoom(room);
+      emitRoomStatus(room);
+      broadcastState(room);
+    });
+  });
+
   socket.on("set-name", ({ name }: { name: string }) => {
     withPlayerContext(socket, ({ room, index, role, roomId }) => {
       const trimmed = normaliseName(name);
       if (!trimmed) return;
-      room.players[role].name = trimmed;
+      const ps = room.players[role];
+      if (ps) ps.name = trimmed;
       room.state.playerNames[index] = trimmed;
       room.state.ready[index] = false;
       persistRoom(room);
@@ -642,13 +698,12 @@ function registerGameEventHandlers(socket: Socket) {
       state.scoreSheets[index][category] = points;
       state.usedCategories[index].add(category);
 
-      const allFilled =
-        state.usedCategories[0].size === 13 && state.usedCategories[1].size === 13;
+      const allFilled = state.usedCategories.every((set) => set.size === 13);
 
       if (allFilled) {
         state.gameOver = true;
         state.phase = "finished";
-        state.ready = [false, false];
+        state.ready = Array.from({ length: state.playerNames.length }, () => false);
       } else {
         advanceTurn(state);
       }
@@ -690,19 +745,21 @@ function withPlayerContext(
     room: GameRoom;
     index: PlayerIndex;
     role: Role;
-    playerNumber: 1 | 2;
+    playerNumber: number;
   }) => void
 ) {
   const assignment = socketAssignments.get(socket.id);
   if (!assignment) return;
   const room = rooms.get(assignment.roomId);
   if (!room) return;
+  const slot = room.players[assignment.role];
+  if (!slot) return;
   handler({
     roomId: room.id,
     room,
     role: assignment.role,
-    index: assignment.role === "p1" ? 0 : 1,
-    playerNumber: assignment.role === "p1" ? 1 : 2,
+    index: slot.index,
+    playerNumber: slot.index,
   });
 }
 
@@ -713,23 +770,27 @@ function startMatch(room: GameRoom) {
   state.dice = rollDice() as Dice;
   state.held = [false, false, false, false, false];
   state.rollsLeft = MAX_ROLLS_PER_TURN - 1;
-  state.currentPlayer = 1;
-  state.ready = [false, false];
+  state.currentPlayer = 0;
+  const n = room.capacity;
+  state.ready = Array.from({ length: n }, () => false);
+  state.playerNames = padArray(state.playerNames, n, "");
+  state.scoreSheets = padArray(state.scoreSheets, n, {} as any);
+  state.usedCategories = padArray(state.usedCategories, n, new Set<Category>());
 }
 
 function advanceTurn(state: GameState) {
   state.dice = rollDice() as Dice;
   state.held = [false, false, false, false, false];
   state.rollsLeft = MAX_ROLLS_PER_TURN - 1;
-  state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
+  const n = Math.max(1, state.playerNames.length);
+  state.currentPlayer = (state.currentPlayer + 1) % n;
 }
 
 function resetRoom(room: GameRoom) {
-  const [nameA, nameB] = room.state.playerNames;
-  room.state = {
-    ...createInitialState(),
-    playerNames: [nameA, nameB],
-  };
+  const n = room.capacity;
+  const preserved = room.state.playerNames.slice(0, n);
+  room.state = createInitialState(n);
+  for (let i = 0; i < n; i += 1) room.state.playerNames[i] = preserved[i] ?? "";
   // Update the createdAt to mark this as a new game
   room.createdAt = Date.now();
 }
@@ -752,6 +813,7 @@ function persistRoom(room: GameRoom) {
     state: serializedState,
     createdAt: room.createdAt,
     updatedAt: now,
+    capacity: room.capacity,
   });
 
   if (isFinished) {
@@ -776,39 +838,36 @@ function persistRoom(room: GameRoom) {
   }
 }
 
-function createInitialState(): GameState {
+function createInitialState(capacity = 2): GameState {
+  const n = Math.max(2, Math.min(6, capacity));
   return {
     dice: rollDice() as Dice,
     held: [false, false, false, false, false],
     rollsLeft: MAX_ROLLS_PER_TURN - 1,
-    currentPlayer: 1,
-    scoreSheets: [{}, {}],
-    usedCategories: [new Set<Category>(), new Set<Category>()],
+    currentPlayer: 0,
+    scoreSheets: Array.from({ length: n }, () => ({})),
+    usedCategories: Array.from({ length: n }, () => new Set<Category>()),
     gameOver: false,
-    playerNames: ["", ""],
+    playerNames: Array.from({ length: n }, () => ""),
     phase: "setup",
-    ready: [false, false],
+    ready: Array.from({ length: n }, () => false),
   };
 }
 
 function serializeState(state: GameState): SerializedGameState {
   return {
     ...state,
-    usedCategories: [
-      Array.from(state.usedCategories[0]),
-      Array.from(state.usedCategories[1]),
-    ],
+    usedCategories: state.usedCategories.map((s) => Array.from(s)),
   };
 }
 
 function materialiseState(serialized: SerializedGameState): GameState {
+  const used = (serialized.usedCategories ?? []).map((arr) => new Set(arr));
+  const n = Math.max(2, used.length, serialized.playerNames?.length ?? 0, serialized.scoreSheets?.length ?? 0);
   return {
     ...serialized,
-    usedCategories: [
-      new Set(serialized.usedCategories[0]),
-      new Set(serialized.usedCategories[1]),
-    ],
-    ready: serialized.ready ?? [false, false],
+    usedCategories: used,
+    ready: serialized.ready && serialized.ready.length === n ? serialized.ready : Array.from({ length: n }, () => false),
     phase: serialized.phase ?? (serialized.gameOver ? "finished" : "setup"),
   };
 }
@@ -829,6 +888,7 @@ function ensureRoom(roomId: string): GameRoom {
     id: roomId,
     state,
     createdAt,
+    capacity: Math.max(2, Math.min(6, (persisted?.capacity ?? (state.playerNames.length || 2)))),
     tokens,
     players: {
       p1: createSlot("p1", 0, state.playerNames[0]),
@@ -841,7 +901,7 @@ function ensureRoom(roomId: string): GameRoom {
   return room;
 }
 
-function createSlot(role: Role, index: 0 | 1, initialName?: string): PlayerSlot {
+function createSlot(role: Role, index: number, initialName?: string): PlayerSlot {
   const safeName = initialName?.trim() ?? "";
   return {
     role,
@@ -871,6 +931,14 @@ function buildHealthPayload() {
     version: process.env.npm_package_version ?? "0.0.0",
     environment: NODE_ENV,
   };
+}
+
+
+function padArray<T>(arr: T[], n: number, fillValue: T): T[] {
+  const out = arr.slice();
+  while (out.length < n) out.push(fillValue);
+  if (out.length > n) out.length = n;
+  return out;
 }
 
 

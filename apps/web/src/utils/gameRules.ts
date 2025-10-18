@@ -38,12 +38,12 @@ const isSmallStraight = (dice: Dice) => {
 
 const scoreCategory = (dice: Dice, category: Category): number => {
     switch (category) {
-    case "ones": return dice.filter((d: number) => d === 1).length * 1;
-    case "twos": return dice.filter((d: number) => d === 2).length * 2;
-    case "threes": return dice.filter((d: number) => d === 3).length * 3;
-    case "fours": return dice.filter((d: number) => d === 4).length * 4;
-    case "fives": return dice.filter((d: number) => d === 5).length * 5;
-    case "sixes": return dice.filter((d: number) => d === 6).length * 6;
+        case "ones": return dice.filter((d: number) => d === 1).length * 1;
+        case "twos": return dice.filter((d: number) => d === 2).length * 2;
+        case "threes": return dice.filter((d: number) => d === 3).length * 3;
+        case "fours": return dice.filter((d: number) => d === 4).length * 4;
+        case "fives": return dice.filter((d: number) => d === 5).length * 5;
+        case "sixes": return dice.filter((d: number) => d === 6).length * 6;
         case "threeKind": return hasNOfAKind(dice, 3) ? sum(dice) : 0;
         case "fourKind": return hasNOfAKind(dice, 4) ? sum(dice) : 0;
         case "fullHouse": return isFullHouse(dice) ? 25 : 0;

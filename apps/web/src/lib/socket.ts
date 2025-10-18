@@ -1,6 +1,6 @@
 ﻿import { io, type Socket } from "socket.io-client";
 
-export type RoomRole = "p1" | "p2";
+export type RoomRole = "p1" | "p2" | "p3" | "p4" | "p5" | "p6";
 
 export type RoleStatus = {
   role: RoomRole;
@@ -12,14 +12,15 @@ export type RoleStatus = {
 
 export type RoomStatusPayload = {
   roomId: string;
-  roles: Record<RoomRole, RoleStatus>;
+  capacity: number; // 2..6
+  roles: Partial<Record<RoomRole, RoleStatus>>;
 };
 
 export type RoleConfirmedPayload = {
   roomId: string;
   role: RoomRole;
   name: string;
-  playerIndex: 0 | 1;
+  playerIndex: number; // 0..N-1
 };
 
 export type RoleDeniedPayload = {
@@ -39,6 +40,10 @@ export type AppSocket = Socket;
 export const ROLE_LABELS: Record<RoomRole, string> = {
   p1: "Spieler 1",
   p2: "Spieler 2",
+  p3: "Spieler 3",
+  p4: "Spieler 4",
+  p5: "Spieler 5",
+  p6: "Spieler 6",
 };
 
 const DEFAULT_SOCKET_URL = "http://localhost:3000";

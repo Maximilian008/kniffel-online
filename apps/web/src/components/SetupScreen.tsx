@@ -5,15 +5,18 @@ type Props = {
   localPlaceholder: string;
   canEdit: boolean;
   localReady: boolean;
-  opponentReady: boolean;
+  opponentReady?: boolean;
   opponentConnected: boolean;
   startDisabled: boolean;
+  playerCount?: number;
+  onPlayerCountChange?: (count: number) => void;
   onNameChange: (value: string) => void;
   onNameFocus: () => void;
   onNameBlur: () => void;
   onStart: () => void;
   onOpenHistory: () => void;
   opponentName?: string;
+  players?: Array<{ name: string; connected: boolean; ready: boolean; isSelf?: boolean }>;
 };
 
 export default function SetupScreen({
@@ -22,7 +25,7 @@ export default function SetupScreen({
   localPlaceholder,
   canEdit,
   localReady,
-  opponentReady,
+  opponentReady = false,
   opponentConnected,
   startDisabled,
   onNameChange,
@@ -30,11 +33,21 @@ export default function SetupScreen({
   onNameBlur,
   onStart,
   onOpenHistory,
+  playerCount,
+  onPlayerCountChange,
   opponentName = "Warten...",
+  players,
 }: Props) {
   const isConnecting = connectionPhase === "connecting";
   const isWaiting = connectionPhase === "waiting";
   const isMatched = connectionPhase === "matched";
+
+  function initials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "?";
+    if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+    return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
+  }
 
   return (
     <div className="panel setup-screen">
@@ -44,6 +57,25 @@ export default function SetupScreen({
       </header>
 
       <div className="name-grid">
+        {/* Spielerzahl-Auswahl */}
+        <div className="name-card">
+          <label>Spielerzahl</label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {[2, 3, 4, 5, 6].map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={`btn ${playerCount === n ? "btn-primary" : "btn-outline"}`}
+                onClick={() => onPlayerCountChange?.(n)}
+                title={`${n} Spieler`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <p className="hint">Wähle die Anzahl der Spieler (2–6).</p>
+        </div>
+
         <div className={`name-card ${isConnecting ? 'loading' : ''}`}>
           <label htmlFor="player-name">Dein Name</label>
           <input
@@ -62,37 +94,124 @@ export default function SetupScreen({
           <p className="hint">Klicke hier, um deinen Namen anzupassen.</p>
           {localReady && (
             <div className="ready-indicator">
-              <span className="ready-icon">✓</span>
-              <span>Bereit!</span>
+              <span
+                className="ready-chip"
+                aria-live="polite"
+                style={{
+                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                  color: '#ecfdf5',
+                  border: '1px solid #22c55e',
+                  padding: '2px 10px',
+                  height: 24,
+                  borderRadius: 999,
+                  boxShadow: '0 0 10px rgba(34,197,94,0.4), 0 2px 8px rgba(34,197,94,0.2)'
+                }}
+              >
+                <span className="chip-icon">✓</span>
+                Bereit
+              </span>
             </div>
           )}
         </div>
 
         <div className={`name-card opponent-card ${!opponentConnected ? 'waiting' : ''}`}>
           <label>Gegner</label>
-          <input
-            type="text"
-            value={opponentConnected ? opponentName : (isWaiting ? "Warten auf Mitspieler..." : "Verbindung wird hergestellt...")}
-            readOnly
-            disabled
-            className="input input-muted"
-          />
-          <div className={`status-indicator ${opponentConnected ? (opponentReady ? "status-ready" : "status-connected") : "status-waiting"}`}>
-            <span className="status-dot"></span>
-            <span className="status-text">
-              {!opponentConnected
-                ? "Offline"
-                : opponentReady
-                  ? "Bereit!"
-                  : "Verbunden"
-              }
-            </span>
-          </div>
-          {opponentReady && (
-            <div className="ready-indicator">
-              <span className="ready-icon">✓</span>
-              <span>Bereit!</span>
+          {players && players.length > 0 ? (
+            <div>
+              <ul
+                className={`player-list ${players.filter(p => !p.isSelf).length >= 5 ? 'player-list--grid' : ''}`}
+                aria-label="Mitspieler"
+                style={{ listStyle: 'none', padding: 0, margin: '0 0 8px 0' }}
+              >
+                {players.filter(p => !p.isSelf).map((p, idx) => (
+                  <li
+                    key={idx}
+                    className="player-list-item"
+                    style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+                  >
+                    <span
+                      className="player-avatar"
+                      style={{
+                        position: 'relative',
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        display: 'grid',
+                        placeItems: 'center',
+                        background: 'rgba(255,255,255,0.08)',
+                        border: '1px solid rgba(148,163,184,0.18)'
+                      }}
+                    >
+                      <span className="player-avatar-text" style={{ fontWeight: 800, fontSize: 12 }}>{initials(p.name || 'Unbekannt')}</span>
+                      <span
+                        className={`avatar-dot ${p.connected ? 'online' : 'offline'}`}
+                        aria-hidden="true"
+                        style={{ position: 'absolute', right: -2, bottom: -2, width: 10, height: 10, borderRadius: '50%', border: '2px solid var(--panel)' }}
+                      />
+                    </span>
+                    <span className="player-list-name" style={{ marginRight: 8 }}>{p.name || 'Unbekannt'}</span>
+                    {p.ready && (
+                      <span
+                        className="ready-chip"
+                        title="Bereit"
+                        aria-label="Bereit"
+                        style={{
+                          marginLeft: 'auto',
+                          background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                          color: '#ecfdf5',
+                          border: '1px solid #22c55e',
+                          padding: '2px 10px',
+                          height: 24,
+                          borderRadius: 999,
+                          boxShadow: '0 0 12px rgba(34,197,94,0.45), 0 2px 10px rgba(34,197,94,0.25)'
+                        }}
+                      >
+                        <span className="chip-icon">✓</span>
+                        Bereit
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className={`status-indicator ${opponentConnected ? (opponentReady ? "status-ready" : "status-connected") : "status-waiting"}`}>
+                <span className="status-dot"></span>
+                <span className="status-text">
+                  {!opponentConnected
+                    ? "Offline"
+                    : opponentReady
+                      ? "Alle Gegner bereit"
+                      : "Verbunden"
+                  }
+                </span>
+              </div>
             </div>
+          ) : (
+            <>
+              <input
+                type="text"
+                value={opponentConnected ? opponentName : (isWaiting ? "Warten auf Mitspieler..." : "Verbindung wird hergestellt...")}
+                readOnly
+                disabled
+                className="input input-muted"
+              />
+              <div className={`status-indicator ${opponentConnected ? (opponentReady ? "status-ready" : "status-connected") : "status-waiting"}`}>
+                <span className="status-dot"></span>
+                <span className="status-text">
+                  {!opponentConnected
+                    ? "Offline"
+                    : opponentReady
+                      ? "Bereit!"
+                      : "Verbunden"
+                  }
+                </span>
+              </div>
+              {opponentReady && (
+                <div className="ready-indicator">
+                  <span className="ready-icon">✓</span>
+                  <span>Bereit!</span>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

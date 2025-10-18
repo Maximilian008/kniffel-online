@@ -23,8 +23,9 @@ export type PersistedGame = {
   createdAt: number;
   updatedAt: number;
   finishedAt: number | null;
-  scores: [number, number] | null;
+  scores: number[] | null;
   winner: string | null;
+  capacity?: number;
 };
 
 function clone<T>(value: T): T {
@@ -120,10 +121,13 @@ function normalizeKey(value: string): string {
   return normaliseName(value).toLowerCase();
 }
 
-function makeParticipants(names: [string, string]): [string, string] {
-  const a = normalizeKey(names[0] ?? "");
-  const b = normalizeKey(names[1] ?? "");
-  return [a, b].sort() as [string, string];
+function makeParticipants(names: string[]): string[] {
+  const unique = new Set<string>();
+  for (const n of names) {
+    const key = normalizeKey(n ?? "");
+    if (key) unique.add(key);
+  }
+  return Array.from(unique).sort();
 }
 
 export function listHistoryFiltered(options?: {
@@ -204,21 +208,21 @@ function calculateFinalScore(sheet: ScoreSheet): number {
   return upper + bonus + lower;
 }
 
-export function deriveScores(state: SerializedGameState): [number, number] {
-  return [
-    calculateFinalScore(state.scoreSheets[0]),
-    calculateFinalScore(state.scoreSheets[1]),
-  ];
+export function deriveScores(state: SerializedGameState): number[] {
+  return state.scoreSheets.map((sheet) => calculateFinalScore(sheet));
 }
 
 export function deriveWinner(
   state: SerializedGameState,
-  scores: [number, number] | null
+  scores: number[] | null
 ): string {
-  const [a, b] = scores ?? deriveScores(state);
-  if (a > b) return state.playerNames[0];
-  if (b > a) return state.playerNames[1];
-  return "Draw";
+  const arr = scores ?? deriveScores(state);
+  if (arr.length === 0) return "Draw";
+  const max = Math.max(...arr);
+  const winners = arr
+    .map((v, i) => (v === max ? (state.playerNames[i] ?? "") : null))
+    .filter((n): n is string => !!n && n.trim().length > 0);
+  return winners.length === 1 ? winners[0]! : "Draw";
 }
 
 export function toPersistedGame(
@@ -229,8 +233,9 @@ export function toPersistedGame(
     createdAt?: number;
     updatedAt?: number;
     finishedAt?: number | null;
-    scores?: [number, number] | null;
+    scores?: number[] | null;
     winner?: string | null;
+    capacity?: number;
   }
 ): PersistedGame {
   const createdAt = params.createdAt ?? Date.now();
@@ -257,5 +262,6 @@ export function toPersistedGame(
     finishedAt,
     scores,
     winner,
+    capacity: params.capacity,
   };
 }
