@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { soundManager } from "../lib/sounds";
 import type {
   Category,
@@ -41,6 +41,44 @@ export default function GameScreen({
 }: Props) {
   const rollsLeft = state.rollsLeft;
   const readyToRoll = isCurrentPlayer && rollsLeft >= 0 && !isRolling;
+  // Local optimistic state for held dice to remove lag while waiting for server echo
+  const [localHeld, setLocalHeld] = useState<boolean[] | null>(null);
+  const lastDiceRef = useRef<string>("");
+  const playersListRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset localHeld if dice values change (new roll) or state.held changes externally
+  useEffect(() => {
+    const diceKey = (state.dice || []).join(",");
+    if (diceKey !== lastDiceRef.current) {
+      lastDiceRef.current = diceKey;
+      setLocalHeld(null);
+    }
+  }, [state.dice]);
+
+  // Effective held array uses local override when present
+  const effectiveHeld = useMemo(() => (
+    localHeld && localHeld.length === state.held.length ? localHeld : state.held
+  ), [localHeld, state.held]);
+
+  // Auto-scroll header players list to the active player when turn changes
+  useEffect(() => {
+    const container = playersListRef.current;
+    if (!container) return;
+    // Only when horizontal overflow exists (mobile/many players)
+    if (container.scrollWidth <= container.clientWidth + 2) return;
+    const target = container.querySelector<HTMLDivElement>(`.player-tag[data-player-index="${state.currentPlayer}"]`);
+    if (!target) return;
+    // Smooth center if possible
+    try {
+      target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' as ScrollLogicalPosition });
+    } catch {
+      // Fallback: manual centering
+      const tr = target.getBoundingClientRect();
+      const cr = container.getBoundingClientRect();
+      const delta = (tr.left + tr.width / 2) - (cr.left + cr.width / 2);
+      container.scrollLeft += delta;
+    }
+  }, [state.currentPlayer]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -103,13 +141,13 @@ export default function GameScreen({
   return (
     <div className="panel game-screen">
       <header className="game-header">
-        <div className="players-list" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div ref={playersListRef} className="players-list" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', overflowX: 'auto' }}>
           {names.map((n, i) => {
             const mine = i === playerIndex;
             const active = state.currentPlayer === i;
             const status = playerStatuses[i] ?? { connected: false, ready: false };
             return (
-              <div key={i} className={`player-tag ${mine ? 'self' : 'opponent'} ${active ? 'active' : ''}`}>
+              <div key={i} data-player-index={i} className={`player-tag ${mine ? 'self' : 'opponent'} ${active ? 'active' : ''}`}>
                 {mine ? <span className="label">Du</span> : <span className="label">Spieler {i + 1}</span>}
                 <strong>{n || `Player ${i + 1}`}</strong>
                 <div className="player-substatus">
@@ -163,9 +201,17 @@ export default function GameScreen({
                 <Dice
                   key={index}
                   value={value}
-                  held={state.held[index]}
-                  isRolling={isRolling && !state.held[index]}
-                  onToggle={() => onToggleHold(index)}
+                  held={effectiveHeld[index]}
+                  isRolling={isRolling && !effectiveHeld[index]}
+                  onToggle={() => {
+                    // Optimistically toggle
+                    setLocalHeld((prev) => {
+                      const base = (prev && prev.length === state.held.length) ? prev.slice() : state.held.slice();
+                      base[index] = !base[index];
+                      return base;
+                    });
+                    onToggleHold(index);
+                  }}
                   disabled={!isCurrentPlayer}
                 />
               ))}
@@ -180,7 +226,12 @@ export default function GameScreen({
                 soundManager.diceRoll();
                 onRoll();
               }}
-              onMouseEnter={() => !isCurrentPlayer ? null : soundManager.buttonHover()}
+              onMouseEnter={() => {
+                if (!isCurrentPlayer) return;
+                if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+                  soundManager.buttonHover();
+                }
+              }}
               disabled={!isCurrentPlayer}
             >
               🎲 Würfeln ({rollsLeft} übrig)
@@ -203,7 +254,11 @@ export default function GameScreen({
                   onReset();
                 }
               }}
-              onMouseEnter={() => soundManager.buttonHover()}
+              onMouseEnter={() => {
+                if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+                  soundManager.buttonHover();
+                }
+              }}
               title="Spiel zurücksetzen (Strg+R)"
             >
               🔄 Zurücksetzen
@@ -214,7 +269,11 @@ export default function GameScreen({
                 soundManager.satisfyingClick();
                 onOpenHistory();
               }}
-              onMouseEnter={() => soundManager.buttonHover()}
+              onMouseEnter={() => {
+                if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+                  soundManager.buttonHover();
+                }
+              }}
               title="Spielverlauf anzeigen (H)"
             >
               📊 Verlauf

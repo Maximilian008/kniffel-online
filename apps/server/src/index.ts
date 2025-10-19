@@ -587,8 +587,8 @@ function registerGameEventHandlers(socket: Socket) {
       // Resize state arrays to match new capacity (preserve names/sheets as possible)
       room.state.playerNames = padArray(room.state.playerNames, next, "");
       room.state.ready = padArray(room.state.ready, next, false);
-      room.state.scoreSheets = padArray(room.state.scoreSheets, next, {} as any);
-      room.state.usedCategories = padArray(room.state.usedCategories, next, new Set<Category>());
+      room.state.scoreSheets = padArrayWithFactory(room.state.scoreSheets, next, () => ({} as any));
+      room.state.usedCategories = padArrayWithFactory(room.state.usedCategories, next, () => new Set<Category>());
 
       persistRoom(room);
       emitRoomStatus(room);
@@ -774,8 +774,8 @@ function startMatch(room: GameRoom) {
   const n = room.capacity;
   state.ready = Array.from({ length: n }, () => false);
   state.playerNames = padArray(state.playerNames, n, "");
-  state.scoreSheets = padArray(state.scoreSheets, n, {} as any);
-  state.usedCategories = padArray(state.usedCategories, n, new Set<Category>());
+  state.scoreSheets = padArrayWithFactory(state.scoreSheets, n, () => ({} as any));
+  state.usedCategories = padArrayWithFactory(state.usedCategories, n, () => new Set<Category>());
 }
 
 function advanceTurn(state: GameState) {
@@ -935,8 +935,17 @@ function buildHealthPayload() {
 
 
 function padArray<T>(arr: T[], n: number, fillValue: T): T[] {
+  // Note: For primitive fill values only. Objects/Sets should use padArrayWithFactory.
   const out = arr.slice();
   while (out.length < n) out.push(fillValue);
+  if (out.length > n) out.length = n;
+  return out;
+}
+
+function padArrayWithFactory<T>(arr: T[], n: number, factory: () => T): T[] {
+  // Ensures each appended element is a fresh instance (avoids shared references between players)
+  const out = arr.slice();
+  while (out.length < n) out.push(factory());
   if (out.length > n) out.length = n;
   return out;
 }

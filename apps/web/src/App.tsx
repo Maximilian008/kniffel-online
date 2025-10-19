@@ -426,11 +426,13 @@ export default function App() {
     !identity || !localNameValid || effectiveConnectionPhase !== "matched" || playerIndex === null;
 
   // Emit capacity changes during setup to server (no-op during playing/finished)
-  useEffect(() => {
+  // Emit capacity changes only on explicit user action to avoid race/flicker on join
+  function handlePlayerCountChange(next: number) {
+    setPlayerCount(next);
     if (!socketRef.current) return;
     if (!gameState || gameState.phase !== "setup") return;
-    socketRef.current.emit("room:setCapacity", { capacity: playerCount });
-  }, [playerCount, gameState?.phase]);
+    socketRef.current.emit("room:setCapacity", { capacity: next });
+  }
 
   // Build players list for SetupScreen (names + online + ready)
   function getSetupPlayers(): Array<{ name: string; connected: boolean; ready: boolean; isSelf?: boolean }> | undefined {
@@ -452,16 +454,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <div
-        style={{
-          position: "fixed",
-          top: 24,
-          right: 24,
-          display: "flex",
-          gap: "8px",
-          zIndex: 60,
-        }}
-      >
+      <div className="top-actions">
         <button
           type="button"
           className="btn btn-ghost"
@@ -538,7 +531,7 @@ export default function App() {
               localReady={localReady}
               startDisabled={startDisabled}
               playerCount={playerCount}
-              onPlayerCountChange={setPlayerCount}
+              onPlayerCountChange={handlePlayerCountChange}
               players={getSetupPlayers()}
             />
           )}
@@ -559,7 +552,7 @@ export default function App() {
               localReady={localReady}
               startDisabled={startDisabled}
               playerCount={playerCount}
-              onPlayerCountChange={setPlayerCount}
+              onPlayerCountChange={handlePlayerCountChange}
               players={getSetupPlayers()}
             />
           )}

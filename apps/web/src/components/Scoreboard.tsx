@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { soundManager } from "../lib/sounds";
 import type {
   Category,
@@ -74,6 +74,7 @@ export default function Scoreboard({
   previewScores,
   onChoose,
 }: Props) {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const n = Math.max(state.scoreSheets.length, playerNames.length);
   const usedSets = useMemo(() => state.usedCategories.map((list: Category[]) => new Set(list)), [state.usedCategories]) as Array<Set<Category>>;
   const sheets = state.scoreSheets as Array<Partial<Record<Category, number>>>;
@@ -87,8 +88,29 @@ export default function Scoreboard({
   );
   const finalTotals = sheets.map((_, index) => upperTotals[index] + bonuses[index] + lowerTotals[index]);
 
+  // Keep active player's column in view when turn changes (horizontal scroll)
+  useEffect(() => {
+    const container = wrapperRef.current;
+    if (!container) return;
+    if (container.scrollWidth <= container.clientWidth + 2) return; // no overflow
+    const table = container.querySelector<HTMLTableElement>('table.scoreboard-table');
+    if (!table) return;
+    // Determine column index we need to show (player index + 1 because column 0 is category)
+    const colIndex = typeof state.currentPlayer === 'number' ? state.currentPlayer + 1 : (activeIndex ?? 0) + 1;
+    const headerCell = table.tHead?.rows?.[0]?.cells?.[colIndex];
+    if (!headerCell) return;
+    try {
+      headerCell.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' as ScrollLogicalPosition });
+    } catch {
+      const tr = headerCell.getBoundingClientRect();
+      const cr = container.getBoundingClientRect();
+      const delta = (tr.left + tr.width / 2) - (cr.left + cr.width / 2);
+      container.scrollLeft += delta;
+    }
+  }, [state.currentPlayer]);
+
   return (
-    <div className="scoreboard-wrapper">
+    <div className="scoreboard-wrapper" ref={wrapperRef}>
       <table className="scoreboard-table">
         <thead>
           <tr>
@@ -250,10 +272,23 @@ function ScoreRow({
             key={columnIndex}
             className={`${classes.join(" ")} ${animatingCell === columnIndex ? 'score-entry-animation' : ''}`}
             onClick={() => handleClick(columnIndex)}
-            onMouseEnter={() => clickable && soundManager.buttonHover()}
+            onMouseEnter={() => {
+              if (!clickable) return;
+              // Only play hover on devices with fine pointer (avoid noisy mobile)
+              if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+                soundManager.buttonHover();
+              }
+            }}
             role={clickable ? "button" : undefined}
             aria-label={clickable ? `${CATEGORY_LABELS[category]} auswählen für ${cellValue} Punkte` : undefined}
             tabIndex={clickable ? 0 : undefined}
+            onKeyDown={(e) => {
+              if (!clickable) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleClick(columnIndex);
+              }
+            }}
           >
             <span className={isPreview ? "preview-score" : ""}>{cellValue}</span>
           </td>
