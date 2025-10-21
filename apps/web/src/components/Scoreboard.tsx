@@ -75,7 +75,7 @@ export default function Scoreboard({
   onChoose,
 }: Props) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const n = Math.max(state.scoreSheets.length, playerNames.length);
+  const playerCount = Math.max(state.scoreSheets.length, playerNames.length);
   const usedSets = useMemo(() => state.usedCategories.map((list: Category[]) => new Set(list)), [state.usedCategories]) as Array<Set<Category>>;
   const sheets = state.scoreSheets as Array<Partial<Record<Category, number>>>;
 
@@ -110,70 +110,76 @@ export default function Scoreboard({
   }, [state.currentPlayer]);
 
   return (
-    <div className="scoreboard-wrapper" ref={wrapperRef}>
-      <table className="scoreboard-table">
-        <thead>
-          <tr>
-            <th>Category</th>
-            {Array.from({ length: n }).map((_, i) => (
-              <th key={i}>{playerNames[i] ?? `Player ${i + 1}`}</th>
+    <section className="scoreboard-section" aria-label="Punktetafel">
+      <div
+        className="scoreboard-wrapper"
+        ref={wrapperRef}
+        data-player-count={playerCount}
+      >
+        <table className="scoreboard-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              {Array.from({ length: playerCount }).map((_, i) => (
+                <th key={i}>{playerNames[i] ?? `Player ${i + 1}`}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="section-row">
+              <td colSpan={playerCount + 1}>Upper section</td>
+            </tr>
+            {UPPER.map((category) => (
+              <ScoreRow
+                key={category}
+                category={category}
+                sheets={sheets}
+                usedSets={usedSets}
+                activeIndex={activeIndex}
+                isCurrentPlayer={isCurrentPlayer}
+                previewScores={previewScores}
+                onChoose={onChoose}
+                columns={playerCount}
+              />
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="section-row">
-            <td colSpan={n + 1}>Upper section</td>
-          </tr>
-          {UPPER.map((category) => (
-            <ScoreRow
-              key={category}
-              category={category}
-              sheets={sheets}
-              usedSets={usedSets}
-              activeIndex={activeIndex}
-              isCurrentPlayer={isCurrentPlayer}
-              previewScores={previewScores}
-              onChoose={onChoose}
-              columns={n}
-            />
-          ))}
-          <tr className="summary-row">
-            <td>Subtotal</td>
-            {Array.from({ length: n }).map((_, i) => (
-              <td key={i}>{upperTotals[i] ?? 0}</td>
+            <tr className="summary-row">
+              <td>Subtotal</td>
+              {Array.from({ length: playerCount }).map((_, i) => (
+                <td key={i}>{upperTotals[i] ?? 0}</td>
+              ))}
+            </tr>
+            <tr className="summary-row">
+              <td>Bonus (63+)</td>
+              {Array.from({ length: playerCount }).map((_, i) => (
+                <td key={i}>{bonuses[i] ?? 0}</td>
+              ))}
+            </tr>
+            <tr className="section-row">
+              <td colSpan={playerCount + 1}>Lower section</td>
+            </tr>
+            {LOWER.map((category) => (
+              <ScoreRow
+                key={category}
+                category={category}
+                sheets={sheets}
+                usedSets={usedSets}
+                activeIndex={activeIndex}
+                isCurrentPlayer={isCurrentPlayer}
+                previewScores={previewScores}
+                onChoose={onChoose}
+                columns={playerCount}
+              />
             ))}
-          </tr>
-          <tr className="summary-row">
-            <td>Bonus (63+)</td>
-            {Array.from({ length: n }).map((_, i) => (
-              <td key={i}>{bonuses[i] ?? 0}</td>
-            ))}
-          </tr>
-          <tr className="section-row">
-            <td colSpan={n + 1}>Lower section</td>
-          </tr>
-          {LOWER.map((category) => (
-            <ScoreRow
-              key={category}
-              category={category}
-              sheets={sheets}
-              usedSets={usedSets}
-              activeIndex={activeIndex}
-              isCurrentPlayer={isCurrentPlayer}
-              previewScores={previewScores}
-              onChoose={onChoose}
-              columns={n}
-            />
-          ))}
-          <tr className="summary-row total">
-            <td>Total score</td>
-            {Array.from({ length: n }).map((_, i) => (
-              <td key={i}>{finalTotals[i] ?? 0}</td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-    </div>
+            <tr className="summary-row total">
+              <td>Total score</td>
+              {Array.from({ length: playerCount }).map((_, i) => (
+                <td key={i}>{finalTotals[i] ?? 0}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

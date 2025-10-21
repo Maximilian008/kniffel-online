@@ -454,36 +454,38 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <div className="top-actions">
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => setIsHelpOpen(true)}
-          title="Hilfe anzeigen"
-        >
-          Hilfe
-        </button>
-        {identity && (
-          <>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={openModal}
-              title="Rolle wechseln"
-            >
-              {ROLE_LABELS[identity.role]} - {identity.name}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={releaseRole}
-              title="Reservierung aufheben"
-            >
-              Abmelden
-            </button>
-          </>
-        )}
-      </div>
+      <nav className="top-actions" aria-label="Hauptaktionen">
+        <div className="top-actions__toolbar">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setIsHelpOpen(true)}
+            title="Hilfe anzeigen"
+          >
+            Hilfe
+          </button>
+          {identity && (
+            <>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={openModal}
+                title="Rolle wechseln"
+              >
+                {ROLE_LABELS[identity.role]} - {identity.name}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={releaseRole}
+                title="Reservierung aufheben"
+              >
+                Abmelden
+              </button>
+            </>
+          )}
+        </div>
+      </nav>
       <RoleSelectModal
         isOpen={isModalOpen}
         status={roomStatus}

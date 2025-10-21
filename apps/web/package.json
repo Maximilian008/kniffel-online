@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p ./tsconfig.app.json && vite build",
-    "preview": "vite preview --port 5173"
+    "preview": "vite preview --port 4173"
   },
   "dependencies": {
     "@game/rules": "workspace:*",

@@ -141,7 +141,7 @@ export default function GameScreen({
   return (
     <div className="panel game-screen">
       <header className="game-header">
-        <div ref={playersListRef} className="players-list" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', overflowX: 'auto' }}>
+        <div ref={playersListRef} className="players-list">
           {names.map((n, i) => {
             const mine = i === playerIndex;
             const active = state.currentPlayer === i;

@@ -73,7 +73,8 @@ export default function HistoryDetail({ entry, onClose }: Props) {
           </div>
 
           <div className="history-detail-scoreboard">
-            <table className="scoreboard-table">
+            <div className="scoreboard-wrapper" data-player-count={sheets.length}>
+              <table className="scoreboard-table">
               <thead>
                 <tr>
                   <th>Kategorie</th>
@@ -126,7 +127,8 @@ export default function HistoryDetail({ entry, onClose }: Props) {
                   <td><strong>{entry.scores[1]}</strong></td>
                 </tr>
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       </div>

@@ -60,7 +60,7 @@ export default function SetupScreen({
         {/* Spielerzahl-Auswahl */}
         <div className="name-card">
           <label>Spielerzahl</label>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="count-buttons">
             {[2, 3, 4, 5, 6].map((n) => (
               <button
                 key={n}
@@ -121,50 +121,30 @@ export default function SetupScreen({
               <ul
                 className={`player-list ${players.filter(p => !p.isSelf).length >= 5 ? 'player-list--grid' : ''}`}
                 aria-label="Mitspieler"
-                style={{ listStyle: 'none', padding: 0, margin: '0 0 8px 0' }}
               >
                 {players.filter(p => !p.isSelf).map((p, idx) => (
                   <li
                     key={idx}
                     className="player-list-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: 10 }}
                   >
                     <span
                       className="player-avatar"
-                      style={{
-                        position: 'relative',
-                        width: 28,
-                        height: 28,
-                        borderRadius: '50%',
-                        display: 'grid',
-                        placeItems: 'center',
-                        background: 'rgba(255,255,255,0.08)',
-                        border: '1px solid rgba(148,163,184,0.18)'
-                      }}
+                      
                     >
-                      <span className="player-avatar-text" style={{ fontWeight: 800, fontSize: 12 }}>{initials(p.name || 'Unbekannt')}</span>
+                      <span className="player-avatar-text">{initials(p.name || 'Unbekannt')}</span>
                       <span
                         className={`avatar-dot ${p.connected ? 'online' : 'offline'}`}
                         aria-hidden="true"
-                        style={{ position: 'absolute', right: -2, bottom: -2, width: 10, height: 10, borderRadius: '50%', border: '2px solid var(--panel)' }}
+                        
                       />
                     </span>
-                    <span className="player-list-name" style={{ marginRight: 8 }}>{p.name || 'Unbekannt'}</span>
+                    <span className="player-list-name">{p.name || 'Unbekannt'}</span>
                     {p.ready && (
                       <span
                         className="ready-chip"
                         title="Bereit"
                         aria-label="Bereit"
-                        style={{
-                          marginLeft: 'auto',
-                          background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                          color: '#ecfdf5',
-                          border: '1px solid #22c55e',
-                          padding: '2px 10px',
-                          height: 24,
-                          borderRadius: 999,
-                          boxShadow: '0 0 12px rgba(34,197,94,0.45), 0 2px 10px rgba(34,197,94,0.25)'
-                        }}
+                        style={{ marginLeft: 'auto' }}
                       >
                         <span className="chip-icon">✓</span>
                         Bereit
