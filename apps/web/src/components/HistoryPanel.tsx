@@ -53,28 +53,35 @@ export default function HistoryPanel({ history, onClose, onRefresh }: Props) {
             </div>
           )}
           <ul className="history-list">
-            {sortedHistory.map((entry) => (
-              <li
-                key={entry.id}
-                className="history-item clickable-history-item"
-                onClick={() => setSelectedEntry(entry)}
-              >
-                <div className="history-meta">
-                  <span className="history-date">
-                    {formatter.format(new Date(entry.finishedAt))}
-                  </span>
-                  <span className="history-winner">
-                    Gewinner: {entry.winner}
-                  </span>
-                </div>
-                <div className="history-names">
-                  {entry.playerNames[0]} ({entry.scores[0]}) vs. {entry.playerNames[1]} ({entry.scores[1]})
-                </div>
-                <div className="history-hint">
-                  Klicken für Details →
-                </div>
-              </li>
-            ))}
+            {sortedHistory.map((entry) => {
+              const participantCount = Math.max(entry.playerNames.length, entry.scores.length, 2);
+              const participants = Array.from({ length: participantCount }, (_, index) => {
+                const fallbackName = `Spieler ${index + 1}`;
+                const name = entry.playerNames[index]?.trim() || fallbackName;
+                const score = entry.scores[index] ?? 0;
+                return `${name} (${score})`;
+              }).join(" vs. ");
+              const winnerText = entry.winner === "Draw" ? "Unentschieden" : entry.winner;
+
+              return (
+                <li
+                  key={entry.id}
+                  className="history-item clickable-history-item"
+                  onClick={() => setSelectedEntry(entry)}
+                >
+                  <div className="history-meta">
+                    <span className="history-date">
+                      {formatter.format(new Date(entry.finishedAt))}
+                    </span>
+                    <span className="history-winner">
+                      Gewinner: {winnerText}
+                    </span>
+                  </div>
+                  <div className="history-names">{participants}</div>
+                  <div className="history-hint">Klicken für Details →</div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>

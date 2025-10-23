@@ -30,15 +30,34 @@ const formatter = new Intl.DateTimeFormat("de-DE", {
 });
 
 export default function HistoryDetail({ entry, onClose }: Props) {
-  const sheets = entry.scoreSheets as [
-    Partial<Record<Category, number>>,
-    Partial<Record<Category, number>>
-  ];
-
+  const playerCount = Math.max(
+    entry.playerNames.length,
+    entry.scores.length,
+    entry.scoreSheets.length,
+    2
+  );
+  const playerNames = Array.from({ length: playerCount }, (_, index) => (
+    entry.playerNames[index]?.trim() || `Spieler ${index + 1}`
+  ));
+  const sheets = Array.from({ length: playerCount }, (_, index) => (
+    entry.scoreSheets[index] ?? {}
+  )) as Array<Partial<Record<Category, number>>>;
   const upperTotals = sheets.map((sheet) =>
     UPPER.reduce((sum, category) => sum + (sheet[category] ?? 0), 0)
   );
+  const lowerTotals = sheets.map((sheet) =>
+    LOWER.reduce((sum, category) => sum + (sheet[category] ?? 0), 0)
+  );
   const bonuses = upperTotals.map((value) => (value >= 63 ? 35 : 0));
+  const computedTotals = sheets.map((_, index) =>
+    upperTotals[index] + bonuses[index] + lowerTotals[index]
+  );
+  const safeScores = Array.from({ length: playerCount }, (_, index) =>
+    entry.scores[index] ?? computedTotals[index] ?? 0
+  );
+  const winnerName = entry.winner?.trim() ?? "";
+  const winnerMatches = (name: string) =>
+    winnerName.length > 0 && winnerName !== "Draw" && name.localeCompare(winnerName, undefined, { sensitivity: "accent" }) === 0;
 
   return (
     <div className="history-overlay">
@@ -57,76 +76,84 @@ export default function HistoryDetail({ entry, onClose }: Props) {
 
         <div className="history-detail-body">
           <div className="history-detail-summary">
-            <div className="history-detail-players">
-              <div className={`player-summary ${entry.winner === entry.playerNames[0] ? 'winner' : ''}`}>
-                <h3>{entry.playerNames[0]}</h3>
-                <div className="final-score">{entry.scores[0]}</div>
-                {entry.winner === entry.playerNames[0] && <div className="winner-badge">🏆 Gewinner</div>}
-              </div>
-              <div className="vs">VS</div>
-              <div className={`player-summary ${entry.winner === entry.playerNames[1] ? 'winner' : ''}`}>
-                <h3>{entry.playerNames[1]}</h3>
-                <div className="final-score">{entry.scores[1]}</div>
-                {entry.winner === entry.playerNames[1] && <div className="winner-badge">🏆 Gewinner</div>}
-              </div>
+            <div className="history-detail-players" data-player-count={playerCount}>
+              {playerNames.map((name, index) => (
+                <div
+                  key={name + index}
+                  className={`player-summary ${winnerMatches(name) ? "winner" : ""}`}
+                >
+                  <h3>{name}</h3>
+                  <div className="final-score">{safeScores[index]}</div>
+                  {winnerMatches(name) && <div className="winner-badge">🏆 Gewinner</div>}
+                </div>
+              ))}
+              {winnerName === "Draw" && (
+                <div className="draw-indicator">Unentschieden</div>
+              )}
             </div>
           </div>
 
           <div className="history-detail-scoreboard">
-            <div className="scoreboard-wrapper" data-player-count={sheets.length}>
+            <div className="scoreboard-wrapper" data-player-count={playerCount}>
               <table className="scoreboard-table">
-              <thead>
-                <tr>
-                  <th>Kategorie</th>
-                  <th>{entry.playerNames[0]}</th>
-                  <th>{entry.playerNames[1]}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="section-row">
-                  <td colSpan={3}>Oberer Bereich</td>
-                </tr>
-                {UPPER.map((category) => (
-                  <tr key={category} className="score-row">
-                    <td className="category-name">{CATEGORY_LABELS[category]}</td>
-                    <td className="score-cell">
-                      {sheets[0][category] ?? "—"}
-                    </td>
-                    <td className="score-cell">
-                      {sheets[1][category] ?? "—"}
-                    </td>
+                <thead>
+                  <tr>
+                    <th>Kategorie</th>
+                    {playerNames.map((name, index) => (
+                      <th key={name + index}>{name}</th>
+                    ))}
                   </tr>
-                ))}
-                <tr className="total-row">
-                  <td>Zwischensumme</td>
-                  <td>{upperTotals[0]}</td>
-                  <td>{upperTotals[1]}</td>
-                </tr>
-                <tr className="bonus-row">
-                  <td>Bonus (≥63)</td>
-                  <td>{bonuses[0]}</td>
-                  <td>{bonuses[1]}</td>
-                </tr>
-                <tr className="section-row">
-                  <td colSpan={3}>Unterer Bereich</td>
-                </tr>
-                {LOWER.map((category) => (
-                  <tr key={category} className="score-row">
-                    <td className="category-name">{CATEGORY_LABELS[category]}</td>
-                    <td className="score-cell">
-                      {sheets[0][category] ?? "—"}
-                    </td>
-                    <td className="score-cell">
-                      {sheets[1][category] ?? "—"}
-                    </td>
+                </thead>
+                <tbody>
+                  <tr className="section-row">
+                    <td colSpan={1 + playerCount}>Oberer Bereich</td>
                   </tr>
-                ))}
-                <tr className="final-total-row">
-                  <td><strong>Gesamtsumme</strong></td>
-                  <td><strong>{entry.scores[0]}</strong></td>
-                  <td><strong>{entry.scores[1]}</strong></td>
-                </tr>
-              </tbody>
+                  {UPPER.map((category) => (
+                    <tr key={category} className="score-row">
+                      <td className="category-name">{CATEGORY_LABELS[category]}</td>
+                      {sheets.map((sheet, index) => (
+                        <td key={index} className="score-cell">
+                          {sheet[category] ?? "—"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  <tr className="total-row">
+                    <td>Zwischensumme</td>
+                    {upperTotals.map((value, index) => (
+                      <td key={index}>{value}</td>
+                    ))}
+                  </tr>
+                  <tr className="bonus-row">
+                    <td>Bonus (≥63)</td>
+                    {bonuses.map((value, index) => (
+                      <td key={index}>{value}</td>
+                    ))}
+                  </tr>
+                  <tr className="section-row">
+                    <td colSpan={1 + playerCount}>Unterer Bereich</td>
+                  </tr>
+                  {LOWER.map((category) => (
+                    <tr key={category} className="score-row">
+                      <td className="category-name">{CATEGORY_LABELS[category]}</td>
+                      {sheets.map((sheet, index) => (
+                        <td key={index} className="score-cell">
+                          {sheet[category] ?? "—"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  <tr className="final-total-row">
+                    <td>
+                      <strong>Gesamtsumme</strong>
+                    </td>
+                    {safeScores.map((score, index) => (
+                      <td key={index}>
+                        <strong>{score}</strong>
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
               </table>
             </div>
           </div>

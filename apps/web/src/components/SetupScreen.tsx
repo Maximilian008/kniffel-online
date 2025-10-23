@@ -129,13 +129,13 @@ export default function SetupScreen({
                   >
                     <span
                       className="player-avatar"
-                      
+
                     >
                       <span className="player-avatar-text">{initials(p.name || 'Unbekannt')}</span>
                       <span
                         className={`avatar-dot ${p.connected ? 'online' : 'offline'}`}
                         aria-hidden="true"
-                        
+
                       />
                     </span>
                     <span className="player-list-name">{p.name || 'Unbekannt'}</span>

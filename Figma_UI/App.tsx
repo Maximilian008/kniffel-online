@@ -6,6 +6,7 @@ import { StatusToast } from "./components/StatusToast";
 import { AnimatedBackground } from "./components/AnimatedBackground";
 import { PlayerSetup } from "./components/PlayerSetup";
 import { CurrentPlayerIndicator } from "./components/CurrentPlayerIndicator";
+import { GameHistory } from "./components/GameHistory";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "./components/ui/alert-dialog";
 
 interface PlayerScore {
@@ -16,6 +17,14 @@ interface Player {
   name: string;
   scores: PlayerScore;
   total: number;
+}
+
+interface GameRecord {
+  id: string;
+  date: string;
+  players: Player[];
+  winner: string;
+  winnerScore: number;
 }
 
 export default function App() {
@@ -30,7 +39,9 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [gameHistory, setGameHistory] = useState<GameRecord[]>([]);
 
   const handlePlayerCountChange = (count: number) => {
     setPlayerCount(count);
@@ -150,6 +161,13 @@ export default function App() {
     return previews;
   };
 
+  const calculatePlayerTotal = (scores: PlayerScore): number => {
+    const upperCategories = SCORE_CATEGORIES.filter(c => c.section === "upper");
+    const upperSubtotal = upperCategories.reduce((sum, cat) => sum + (scores[cat.key] || 0), 0);
+    const bonus = upperSubtotal >= 63 ? 35 : 0;
+    return Object.values(scores).reduce((sum, score) => sum + (score || 0), 0) + bonus;
+  };
+
   const handleCategoryClick = (category: string) => {
     if (rollsLeft === 3) return;
     if (players[currentPlayerIndex].scores[category] !== null) return;
@@ -157,6 +175,7 @@ export default function App() {
     const score = calculateScore(category, dice);
     const newPlayers = [...players];
     newPlayers[currentPlayerIndex].scores[category] = score;
+    newPlayers[currentPlayerIndex].total = calculatePlayerTotal(newPlayers[currentPlayerIndex].scores);
     setPlayers(newPlayers);
 
     const categoryName = SCORE_CATEGORIES.find(c => c.key === category)?.name;
@@ -193,12 +212,35 @@ export default function App() {
     );
   };
 
+  const saveGameToHistory = (completedPlayers: Player[]) => {
+    const winner = completedPlayers.reduce((prev, current) => 
+      (current.total > prev.total) ? current : prev
+    );
+
+    const gameRecord: GameRecord = {
+      id: `game-${Date.now()}`,
+      date: new Date().toLocaleDateString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      players: completedPlayers.map(p => ({ ...p, scores: { ...p.scores } })),
+      winner: winner.name,
+      winnerScore: winner.total,
+    };
+
+    setGameHistory(prev => [gameRecord, ...prev]);
+  };
+
   useEffect(() => {
     if (players.length > 0 && isGameComplete()) {
       const winner = players.reduce((prev, current) => 
         (current.total > prev.total) ? current : prev
       );
       showToastMessage(`🏆 ${winner.name} wins with ${winner.total} points!`);
+      saveGameToHistory(players);
     }
   }, [players]);
 
@@ -235,7 +277,7 @@ export default function App() {
               rollsLeft={rollsLeft}
               onToggleHeld={toggleHeld}
               onRoll={rollDice}
-              onShowHistory={() => showToastMessage("History feature coming soon! 📜")}
+              onShowHistory={() => setShowHistory(true)}
               onReset={resetGame}
               soundEnabled={soundEnabled}
               onToggleSound={() => {
@@ -257,28 +299,40 @@ export default function App() {
 
         <StatusToast message={toastMessage} isVisible={showToast} />
 
+        <GameHistory
+          isOpen={showHistory}
+          onClose={() => setShowHistory(false)}
+          history={gameHistory}
+        />
+
         <AlertDialog open={showHelp} onOpenChange={setShowHelp}>
           <AlertDialogContent className="bg-[#3d2549] border border-orange-500/30 text-amber-100">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-orange-300">How to Play 🎲</AlertDialogTitle>
-              <AlertDialogDescription className="text-amber-100/90 space-y-2">
-                <p><strong>Goal:</strong> Score the most points by rolling dice combinations.</p>
-                <p><strong>Gameplay:</strong></p>
+              <AlertDialogDescription className="text-amber-100/90">
+                Score the most points by rolling dice combinations.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="text-amber-100/90 space-y-3 text-sm">
+              <div>
+                <div className="mb-2"><strong>Gameplay:</strong></div>
                 <ul className="list-disc list-inside space-y-1 ml-2">
                   <li>Roll the dice up to 3 times per turn</li>
                   <li>After rolling, tap dice to hold them</li>
                   <li>Choose a scoring category after your rolls</li>
                   <li>Each category can only be used once</li>
                 </ul>
-                <p className="mt-4"><strong>Special combinations:</strong></p>
+              </div>
+              <div>
+                <div className="mb-2"><strong>Special combinations:</strong></div>
                 <ul className="list-disc list-inside space-y-1 ml-2">
                   <li>Full House: 3 of one number + 2 of another (25 pts)</li>
                   <li>Small Straight: 4 in a row (30 pts)</li>
                   <li>Large Straight: 5 in a row (40 pts)</li>
                   <li>Yahtzee: All 5 dice the same (50 pts)</li>
                 </ul>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
+              </div>
+            </div>
             <AlertDialogFooter>
               <AlertDialogAction className="bg-orange-500 hover:bg-orange-600">
                 Got it!
