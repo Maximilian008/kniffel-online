@@ -138,6 +138,24 @@ export default function GameScreen({
 
   // Status message not needed in header anymore
 
+  const renderDie = (value: number, index: number) => (
+    <Dice
+      key={index}
+      value={value}
+      held={effectiveHeld[index]}
+      isRolling={isRolling && !effectiveHeld[index]}
+      onToggle={() => {
+        setLocalHeld((prev) => {
+          const base = (prev && prev.length === state.held.length) ? prev.slice() : state.held.slice();
+          base[index] = !base[index];
+          return base;
+        });
+        onToggleHold(index);
+      }}
+      disabled={!isCurrentPlayer}
+    />
+  );
+
   return (
     <div className="panel game-screen">
       <header className="game-header">
@@ -196,25 +214,13 @@ export default function GameScreen({
             />
           </div>
           <div className="dice-main-area">
-            <div className="dice-row">
-              {state.dice.map((value: number, index: number) => (
-                <Dice
-                  key={index}
-                  value={value}
-                  held={effectiveHeld[index]}
-                  isRolling={isRolling && !effectiveHeld[index]}
-                  onToggle={() => {
-                    // Optimistically toggle
-                    setLocalHeld((prev) => {
-                      const base = (prev && prev.length === state.held.length) ? prev.slice() : state.held.slice();
-                      base[index] = !base[index];
-                      return base;
-                    });
-                    onToggleHold(index);
-                  }}
-                  disabled={!isCurrentPlayer}
-                />
-              ))}
+            <div className="dice-stack">
+              <div className="dice-row dice-row--top">
+                {state.dice.slice(0, 2).map((value, index) => renderDie(value, index))}
+              </div>
+              <div className="dice-row dice-row--bottom">
+                {state.dice.slice(2).map((value, index) => renderDie(value, index + 2))}
+              </div>
             </div>
           </div>
         </div>

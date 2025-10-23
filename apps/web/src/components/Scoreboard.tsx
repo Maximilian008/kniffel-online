@@ -76,6 +76,88 @@ export default function Scoreboard({
 }: Props) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const playerCount = Math.max(state.scoreSheets.length, playerNames.length);
+  const [isCompact, setIsCompact] = useState(false);
+  const [visibleStart, setVisibleStart] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 900px)");
+    const handleChange = (event: MediaQueryListEvent | MediaQueryList) => {
+      setIsCompact(event.matches);
+    };
+    handleChange(media);
+    if (media.addEventListener) {
+      media.addEventListener("change", handleChange);
+    } else {
+      media.addListener(handleChange);
+    }
+    return () => {
+      if (media.removeEventListener) {
+        media.removeEventListener("change", handleChange);
+      } else {
+        media.removeListener(handleChange);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isCompact) {
+      setVisibleStart(0);
+      return;
+    }
+    const maxStart = Math.max(0, playerCount - 2);
+    setVisibleStart((prev) => Math.min(prev, maxStart));
+  }, [isCompact, playerCount]);
+
+  const visibleIndexes = useMemo<PlayerIndex[]>(() => {
+    if (!isCompact) {
+      return Array.from({ length: playerCount }, (_, index) => index as PlayerIndex);
+    }
+    const count = Math.min(2, playerCount);
+    const indexes: PlayerIndex[] = [];
+    for (let offset = 0; offset < count; offset += 1) {
+      const nextIndex = visibleStart + offset;
+      if (nextIndex < playerCount) {
+        indexes.push(nextIndex as PlayerIndex);
+      }
+    }
+    return indexes;
+  }, [isCompact, playerCount, visibleStart]);
+
+  const showCycleControl = isCompact && playerCount > 2;
+
+  const currentLabel = useMemo(() => {
+    if (visibleIndexes.length > 0) {
+      return visibleIndexes
+        .map((index) => playerNames[index] ?? `Player ${index + 1}`)
+        .join(" & ");
+    }
+    return playerNames
+      .slice(0, Math.min(2, playerCount))
+      .map((name, idx) => name ?? `Player ${idx + 1}`)
+      .join(" & ");
+  }, [playerCount, playerNames, visibleIndexes]);
+
+  useEffect(() => {
+    if (!isCompact) return;
+    if (playerCount <= 2) return;
+    if (state.currentPlayer === undefined || state.currentPlayer === null) return;
+    const maxStart = Math.max(0, playerCount - 2);
+    if (state.currentPlayer < visibleStart || state.currentPlayer > visibleStart + 1) {
+      const newStart = Math.min(state.currentPlayer, maxStart);
+      setVisibleStart(newStart);
+    }
+  }, [isCompact, playerCount, state.currentPlayer, visibleStart]);
+
+  const nextLabel = useMemo(() => {
+    if (!showCycleControl) return "";
+    const maxStart = Math.max(0, playerCount - 2);
+    const nextStart = visibleStart + 1 > maxStart ? 0 : visibleStart + 1;
+    const indexes = [nextStart, nextStart + 1].filter((value) => value < playerCount);
+    return indexes
+      .map((index) => playerNames[index] ?? `Player ${index + 1}`)
+      .join(" & ");
+  }, [playerCount, playerNames, showCycleControl, visibleStart]);
   const usedSets = useMemo(() => state.usedCategories.map((list: Category[]) => new Set(list)), [state.usedCategories]) as Array<Set<Category>>;
   const sheets = state.scoreSheets as Array<Partial<Record<Category, number>>>;
 
@@ -90,6 +172,7 @@ export default function Scoreboard({
 
   // Keep active player's column in view when turn changes (horizontal scroll)
   useEffect(() => {
+    if (isCompact) return;
     const container = wrapperRef.current;
     if (!container) return;
     if (container.scrollWidth <= container.clientWidth + 2) return; // no overflow
@@ -107,7 +190,7 @@ export default function Scoreboard({
       const delta = (tr.left + tr.width / 2) - (cr.left + cr.width / 2);
       container.scrollLeft += delta;
     }
-  }, [state.currentPlayer]);
+      }, [isCompact, state.currentPlayer, activeIndex]);
 
   return (
     <section className="scoreboard-section" aria-label="Punktetafel">
@@ -120,14 +203,19 @@ export default function Scoreboard({
           <thead>
             <tr>
               <th>Category</th>
-              {Array.from({ length: playerCount }).map((_, i) => (
-                <th key={i}>{playerNames[i] ?? `Player ${i + 1}`}</th>
+              {visibleIndexes.map((playerIndex) => (
+                <th
+                  key={playerIndex}
+                  className={`player-head ${state.currentPlayer === playerIndex ? "active-player" : ""}`}
+                >
+                  {playerNames[playerIndex] ?? `Player ${playerIndex + 1}`}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             <tr className="section-row">
-              <td colSpan={playerCount + 1}>Upper section</td>
+              <td colSpan={visibleIndexes.length + 1}>Upper section</td>
             </tr>
             {UPPER.map((category) => (
               <ScoreRow
@@ -139,23 +227,23 @@ export default function Scoreboard({
                 isCurrentPlayer={isCurrentPlayer}
                 previewScores={previewScores}
                 onChoose={onChoose}
-                columns={playerCount}
+                visibleIndexes={visibleIndexes}
               />
             ))}
             <tr className="summary-row">
               <td>Subtotal</td>
-              {Array.from({ length: playerCount }).map((_, i) => (
-                <td key={i}>{upperTotals[i] ?? 0}</td>
+              {visibleIndexes.map((playerIndex) => (
+                <td key={playerIndex}>{upperTotals[playerIndex] ?? 0}</td>
               ))}
             </tr>
             <tr className="summary-row">
               <td>Bonus (63+)</td>
-              {Array.from({ length: playerCount }).map((_, i) => (
-                <td key={i}>{bonuses[i] ?? 0}</td>
+              {visibleIndexes.map((playerIndex) => (
+                <td key={playerIndex}>{bonuses[playerIndex] ?? 0}</td>
               ))}
             </tr>
             <tr className="section-row">
-              <td colSpan={playerCount + 1}>Lower section</td>
+              <td colSpan={visibleIndexes.length + 1}>Lower section</td>
             </tr>
             {LOWER.map((category) => (
               <ScoreRow
@@ -167,18 +255,39 @@ export default function Scoreboard({
                 isCurrentPlayer={isCurrentPlayer}
                 previewScores={previewScores}
                 onChoose={onChoose}
-                columns={playerCount}
+                visibleIndexes={visibleIndexes}
               />
             ))}
             <tr className="summary-row total">
               <td>Total score</td>
-              {Array.from({ length: playerCount }).map((_, i) => (
-                <td key={i}>{finalTotals[i] ?? 0}</td>
+              {visibleIndexes.map((playerIndex) => (
+                <td key={playerIndex}>{finalTotals[playerIndex] ?? 0}</td>
               ))}
             </tr>
           </tbody>
         </table>
       </div>
+      {showCycleControl && (
+        <div className="scoreboard-compact-controls">
+          <span className="scoreboard-compact-label">
+            Spieler {currentLabel || "--"}
+          </span>
+          <button
+            type="button"
+            className="btn btn-outline scoreboard-cycle"
+            onClick={() => {
+              if (playerCount <= 2) return;
+              const maxStart = Math.max(0, playerCount - 2);
+              setVisibleStart((prev) => {
+                const next = prev + 1;
+                return next > maxStart ? 0 : next;
+              });
+            }}
+          >
+            Weiter: {nextLabel}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
@@ -191,7 +300,7 @@ type RowProps = {
   isCurrentPlayer: boolean;
   previewScores: Record<Category, number> | null;
   onChoose?: (category: Category) => void;
-  columns: number;
+  visibleIndexes: number[];
 };
 
 function ScoreRow({
@@ -202,7 +311,7 @@ function ScoreRow({
   isCurrentPlayer,
   previewScores,
   onChoose,
-  columns,
+  visibleIndexes,
 }: RowProps) {
   const [animatingCell, setAnimatingCell] = useState<PlayerIndex | null>(null);
   const [screenShake, setScreenShake] = useState(false);
@@ -257,8 +366,7 @@ function ScoreRow({
         <span>{CATEGORY_LABELS[category]}</span>
         <span className="category-hint">{CATEGORY_DESCRIPTIONS[category]}</span>
       </td>
-      {Array.from({ length: columns }).map((_, column) => {
-        const columnIndex = column as PlayerIndex;
+      {visibleIndexes.map((columnIndex) => {
         const clickable =
           !!onChoose &&
           activeIndex !== undefined &&
@@ -303,3 +411,14 @@ function ScoreRow({
     </tr>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
