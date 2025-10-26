@@ -1597,9 +1597,20 @@ body {
   margin-bottom: 24px;
 }
 
-.player-summary {\r\n  text-align: center;\r\n  padding: 20px;\r\n  border-radius: 18px;\r\n  background: rgba(255, 249, 236, 0.85);\r\n  border: 1px solid rgba(183, 118, 66, 0.28);\r\n  box-shadow: var(--shadow-soft);\r\n  transition: all 0.3s ease;\r\n}
+.player-summary {
+  text-align: center;
+  padding: 20px;
+  border-radius: 18px;
+  background: rgba(255, 249, 236, 0.85);
+  border: 1px solid rgba(183, 118, 66, 0.28);
+  box-shadow: var(--shadow-soft);
+  transition: all 0.3s ease;
+}
 
-.player-summary.winner {\r\n  border-color: rgba(199, 126, 53, 0.48);\r\n  background: linear-gradient(140deg, rgba(255, 229, 193, 0.95), rgba(249, 154, 81, 0.85));\r\n}
+.player-summary.winner {
+  border-color: rgba(199, 126, 53, 0.48);
+  background: linear-gradient(140deg, rgba(255, 229, 193, 0.95), rgba(249, 154, 81, 0.85));
+}
 
 .player-summary h3 {
   margin: 0 0 8px 0;
