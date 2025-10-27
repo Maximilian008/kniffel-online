@@ -6,6 +6,7 @@ import { FinishedView } from "./autumn/screens/Game/FinishedView";
 import { GameView, type PlayerStatus } from "./autumn/screens/Game/GameView";
 import { HistoryModal } from "./autumn/screens/History/HistoryModal";
 import { SetupScreen, type SetupPlayer } from "./autumn/screens/Setup/SetupScreen";
+import { StartScreen as Autumn2StartScreen } from "./autumn2/screens/Start/StartScreen";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -189,6 +190,10 @@ function getTopBarHint(
 }
 
 export default function App() {
+    const useNewStartFlow =
+        import.meta.env.VITE_NEW_START_FLOW === "1" ||
+        (typeof window !== "undefined" && window.location.search.includes("new=1"));
+
     const socketRef = useRef<AppSocket | null>(null);
     const [socket, setSocket] = useState<AppSocket | null>(null);
     const [connectionPhase, setConnectionPhase] = useState<ConnectionPhase>("connecting");
@@ -598,6 +603,10 @@ export default function App() {
                     Verbindung wird hergestellt...
                 </div>
             );
+        }
+
+        if (useNewStartFlow && (!gameState || gameState.phase === "setup")) {
+            return <Autumn2StartScreen />;
         }
 
         if (!gameState || gameState.phase === "setup") {
