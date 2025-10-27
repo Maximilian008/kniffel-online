@@ -194,6 +194,14 @@ export default function App() {
         import.meta.env.VITE_NEW_START_FLOW === "1" ||
         (typeof window !== "undefined" && window.location.search.includes("new=1"));
 
+    if (useNewStartFlow) {
+        return (
+            <main className="min-h-screen">
+                <Autumn2StartScreen />
+            </main>
+        );
+    }
+
     const socketRef = useRef<AppSocket | null>(null);
     const [socket, setSocket] = useState<AppSocket | null>(null);
     const [connectionPhase, setConnectionPhase] = useState<ConnectionPhase>("connecting");
@@ -251,16 +259,6 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        if (useNewStartFlow) {
-            if (socketRef.current) {
-                socketRef.current.removeAllListeners();
-                socketRef.current.disconnect();
-                socketRef.current = null;
-            }
-            setSocket(null);
-            return;
-        }
-
         const instance = createSocket(socketUrl);
         if (!instance) {
             socketRef.current = null;
@@ -314,7 +312,7 @@ export default function App() {
             socketRef.current = null;
             setSocket(null);
         };
-    }, [showToast, socketUrl, useNewStartFlow]);
+    }, [showToast, socketUrl]);
 
     const identityApi = usePlayerIdentity(socket);
     const {

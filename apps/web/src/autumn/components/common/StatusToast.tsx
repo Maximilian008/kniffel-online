@@ -6,6 +6,14 @@ type StatusToastProps = {
 };
 
 export function StatusToast({ message, isVisible }: StatusToastProps) {
+    const disableToast =
+        import.meta.env.VITE_NEW_START_FLOW === "1" ||
+        (typeof window !== "undefined" && window.location.search.includes("new=1"));
+
+    if (disableToast) {
+        return null;
+    }
+
     return (
         <AnimatePresence>
             {isVisible && message && (
