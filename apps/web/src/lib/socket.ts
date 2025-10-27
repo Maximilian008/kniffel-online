@@ -51,7 +51,13 @@ const RECONNECTION_DELAY_MS = 1_000;
 const RECONNECTION_DELAY_MAX_MS = 5_000;
 const CONNECTION_TIMEOUT_MS = 20_000;
 
-export function createSocket(url?: string): AppSocket {
+const SOCKET_DISABLED =
+    import.meta.env.VITE_NEW_START_FLOW === "1" || import.meta.env.VITE_DISABLE_SOCKETS === "1";
+
+export function createSocket(url?: string): AppSocket | null {
+  if (SOCKET_DISABLED) {
+    return null;
+  }
   // Use provided URL, or fallback to default for server-side rendering
   const target = url ?? DEFAULT_SOCKET_URL;
 
@@ -66,3 +72,5 @@ export function createSocket(url?: string): AppSocket {
     forceNew: false,
   });
 }
+
+export { SOCKET_DISABLED };

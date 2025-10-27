@@ -251,7 +251,23 @@ export default function App() {
     }, []);
 
     useEffect(() => {
+        if (useNewStartFlow) {
+            if (socketRef.current) {
+                socketRef.current.removeAllListeners();
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+            setSocket(null);
+            return;
+        }
+
         const instance = createSocket(socketUrl);
+        if (!instance) {
+            socketRef.current = null;
+            setSocket(null);
+            return;
+        }
+
         socketRef.current = instance;
         setSocket(instance);
 
@@ -298,7 +314,7 @@ export default function App() {
             socketRef.current = null;
             setSocket(null);
         };
-    }, [showToast, socketUrl]);
+    }, [showToast, socketUrl, useNewStartFlow]);
 
     const identityApi = usePlayerIdentity(socket);
     const {
@@ -700,10 +716,10 @@ export default function App() {
                 <TopBar
                     onHelp={() => setIsHelpOpen(true)}
                     onOpenHistory={handleShowHistory}
-                    onOpenRoleModal={openModal}
-                    onReleaseSeat={identity ? releaseRole : undefined}
-                    identityLabel={identity ? ROLE_LABELS[identity.role] : undefined}
-                    identityName={identity?.name}
+                    onOpenRoleModal={!useNewStartFlow ? openModal : undefined}
+                    onReleaseSeat={!useNewStartFlow && identity ? releaseRole : undefined}
+                    identityLabel={!useNewStartFlow && identity ? ROLE_LABELS[identity.role] : undefined}
+                    identityName={!useNewStartFlow ? identity?.name : undefined}
                     connectionHint={topBarHint}
                 />
 
@@ -721,16 +737,18 @@ export default function App() {
                     isLoading={historyLoading}
                 />
 
-                <RoleSelectModal
-                    isOpen={isModalOpen}
-                    status={roomStatus}
-                    suggestedName={suggestedName}
-                    onClose={closeModal}
-                    onClaim={(role, name) => claimRole(role, name)}
-                    isClaiming={isClaiming}
-                    error={roleError}
-                    clearError={clearError}
-                />
+                {!useNewStartFlow && (
+                    <RoleSelectModal
+                        isOpen={isModalOpen}
+                        status={roomStatus}
+                        suggestedName={suggestedName}
+                        onClose={closeModal}
+                        onClaim={(role, name) => claimRole(role, name)}
+                        isClaiming={isClaiming}
+                        error={roleError}
+                        clearError={clearError}
+                    />
+                )}
 
                 <AlertDialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
                     <AlertDialogContent className="border-2 border-orange-500/30 bg-[#3d2549] text-amber-100">
