@@ -1,3 +1,24 @@
 :root {
-    --autumn-bottom-breath: clamp(80px, 10vh, 140px);
+    --a2-bg: #f9f4ef;
+    --a2-panel: rgba(255, 255, 255, 0.8);
+    --a2-panel-border: rgba(143, 89, 49, 0.1);
+    --a2-text-primary: #2c1408;
+    --a2-text-muted: rgba(99, 63, 45, 0.6);
+    --a2-placeholder: #9f6644;
+    --a2-accent: #d47a2e;
+    --a2-accent-hover-from: #e27f2b;
+    --a2-accent-hover-to: #f0ad43;
+    --a2-shadow-warm: rgba(120, 60, 15, 0.6);
+    --a2-badge-ready-bg: #f4eadf;
+    --a2-badge-ready-border: #d39564;
+    --a2-badge-conn-bg: #ebe2f7;
+    --a2-badge-conn-border: #a07bd8;
+    --a2-badge-off-bg: #f8d8d3;
+    --a2-badge-off-border: #d77a6f;
+    --a2-radius-container: 1.25rem;
+    --a2-radius-control: 0.6rem;
+    --a2-radius-chip: 9999px;
+    --a2-bottom-breath: clamp(80px, 10vh, 140px);
 }
+
+/* Hex → Var Zuordnung: siehe tokens.ts */
