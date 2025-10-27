@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import "../../styles/theme.css";
 
@@ -22,6 +23,7 @@ function formatJoinCode(value: string) {
 export function StartScreen() {
     const { displayName, setDisplayName } = useIdentity();
     const { create, join, rejoin, state: roomState } = useRoom();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabKey>("host");
     const [playerCount, setPlayerCount] = useState<number>(4);
     const [joinCode, setJoinCode] = useState<string>("");
@@ -38,7 +40,7 @@ export function StartScreen() {
 
     const formattedJoinCode = useMemo(() => formatJoinCode(joinCode), [joinCode]);
     const inviteUrl = useMemo(() => {
-        if (!created) return "";
+        if (!created || typeof window === "undefined") return "";
         const params = new URLSearchParams({ room: created.roomId, t: created.inviteToken });
         return `${window.location.origin}/?${params.toString()}`;
     }, [created]);
@@ -60,6 +62,8 @@ export function StartScreen() {
         const result = await create({ name, playerCount });
         setCreated(result);
         setCopyStatus("idle");
+        const url = `/?new=1&room=${result.roomId}&t=${result.inviteToken}`;
+        navigate(url, { replace: true });
     }
 
     async function handleJoinSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -68,6 +72,8 @@ export function StartScreen() {
         if (!code) return;
         const { roomId } = await join({ code });
         console.log("joined", roomId);
+        const token = `mock.${roomId}`;
+        navigate(`/?new=1&room=${roomId}&t=${token}`, { replace: true });
     }
 
     function handleJoinCodeChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -89,7 +95,7 @@ export function StartScreen() {
     const isJoining = roomState === "joining";
 
     async function handleCopy() {
-        if (!inviteUrl) return;
+    if (!inviteUrl || typeof navigator === "undefined" || !navigator.clipboard) return;
         try {
             await navigator.clipboard.writeText(inviteUrl);
             setCopyStatus("copied");
@@ -103,6 +109,7 @@ export function StartScreen() {
         if (!lastRoomId) return;
         await rejoin({ roomId: lastRoomId });
         console.log("rejoined", lastRoomId);
+        navigate(`/?new=1&room=${lastRoomId}&t=mock.${lastRoomId}`, { replace: true });
     }
 
     return (
