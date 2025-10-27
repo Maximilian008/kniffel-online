@@ -7,6 +7,7 @@ import { Button } from "../../../autumn/ui/button";
 import { Input } from "../../../autumn/ui/input";
 import { useIdentity } from "../../hooks/useIdentity";
 import { useRoom } from "../../hooks/useRoom";
+import { useSessionGuard } from "../../hooks/useSessionGuard";
 
 type TabKey = "host" | "join";
 
@@ -24,6 +25,7 @@ export function StartScreen() {
     const { displayName, setDisplayName } = useIdentity();
     const { create, join, rejoin, state: roomState } = useRoom();
     const navigate = useNavigate();
+    const { resumeRoomId } = useSessionGuard();
     const [activeTab, setActiveTab] = useState<TabKey>("host");
     const [playerCount, setPlayerCount] = useState<number>(4);
     const [joinCode, setJoinCode] = useState<string>("");
@@ -53,7 +55,7 @@ export function StartScreen() {
         } catch {
             setLastRoomId(null);
         }
-    }, [created]);
+    }, [created, resumeRoomId]);
 
     async function handleNameSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -106,10 +108,11 @@ export function StartScreen() {
     }
 
     async function handleResume() {
-        if (!lastRoomId) return;
-        await rejoin({ roomId: lastRoomId });
-        console.log("rejoined", lastRoomId);
-        navigate(`/?new=1&room=${lastRoomId}&t=mock.${lastRoomId}`, { replace: true });
+    const room = resumeRoomId ?? lastRoomId;
+    if (!room) return;
+    await rejoin({ roomId: room });
+    console.log("rejoined", room);
+    navigate(`/?new=1&room=${room}&t=mock.${room}`, { replace: true });
     }
 
     return (
@@ -354,7 +357,7 @@ export function StartScreen() {
                         color: "var(--a2-text-muted)",
                     }}
                 >
-                    {lastRoomId ? (
+                    {resumeRoomId || lastRoomId ? (
                         <Button
                             type="button"
                             variant="autumn"
