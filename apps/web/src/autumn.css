@@ -1,2 +1,3 @@
-@import "../../../Figma_UI/Autumn-Themed Dice Game UI/src/styles/globals.css";
-@import "../../../Figma_UI/Autumn-Themed Dice Game UI/src/index.css";
+@import "./autumn/styles/figma-globals.css";
+@import "./autumn/styles/figma-utilities.css";
+@import "./autumn/styles/theme.css";

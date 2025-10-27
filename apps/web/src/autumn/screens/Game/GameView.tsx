@@ -1,10 +1,11 @@
-import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { soundManager } from "../../../lib/sounds";
 import type { Category, SerializedGameState } from "../../../types/shared";
-import { DiceArea } from "../../components/dice/DiceArea";
 import { CurrentPlayerIndicator } from "../../components/game/CurrentPlayerIndicator";
+import { DiceArea } from "../../components/game/DiceArea";
 import { Scoreboard } from "../../components/game/Scoreboard";
+
+// Layout note: Root-Cause: shell <main> stretched to full viewport height without bottom padding, letting Scoreboard sit flush. Fix: add safe-area-aware padding on <main>; keep local layout gap-only.
 
 export type PlayerStatus = { connected: boolean; ready: boolean };
 
@@ -23,25 +24,9 @@ type GameViewProps = {
     onChooseCategory: (category: Category) => void;
     onReset: () => void;
     onOpenHistory: () => void;
-    playerStatuses: PlayerStatus[];
     soundEnabled: boolean;
     onToggleSound: (enabled: boolean) => void;
 };
-
-function getStatusMessage(args: {
-    isCurrentPlayer: boolean;
-    rollsLeft: number;
-    phase: SerializedGameState["phase"];
-    names: string[];
-    currentPlayer: number;
-}) {
-    if (args.phase !== "playing") return "Bereite das Spiel vor...";
-    if (args.isCurrentPlayer) {
-        return `Du bist dran. ${args.rollsLeft} Wurf${args.rollsLeft === 1 ? "" : "e"} übrig.`;
-    }
-    const name = args.names[args.currentPlayer] || `Spieler ${args.currentPlayer + 1}`;
-    return `${name} ist am Zug.`;
-}
 
 export function GameView({
     state,
@@ -55,14 +40,12 @@ export function GameView({
     onChooseCategory,
     onReset,
     onOpenHistory,
-    playerStatuses,
     soundEnabled,
     onToggleSound,
 }: GameViewProps) {
     const rollsLeft = state.rollsLeft;
     const [localHeld, setLocalHeld] = useState<boolean[] | null>(null);
     const lastDiceKey = useRef<string>("");
-    const playersListRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         const key = state.dice.join(",");
@@ -79,22 +62,6 @@ export function GameView({
         return state.held;
     }, [localHeld, state.held]);
 
-    useEffect(() => {
-        const container = playersListRef.current;
-        if (!container) return;
-        if (container.scrollWidth <= container.clientWidth + 2) return;
-        const selector = `.player-chip[data-player-index="${state.currentPlayer}"]`;
-        const target = container.querySelector<HTMLDivElement>(selector);
-        if (!target) return;
-        try {
-            target.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-        } catch {
-            const tr = target.getBoundingClientRect();
-            const cr = container.getBoundingClientRect();
-            const delta = tr.left + tr.width / 2 - (cr.left + cr.width / 2);
-            container.scrollLeft += delta;
-        }
-    }, [state.currentPlayer]);
 
     useEffect(() => {
         if (!isCurrentPlayer) return;
@@ -164,55 +131,11 @@ export function GameView({
         onToggleHold(index);
     };
 
-    const statusMessage = getStatusMessage({
-        isCurrentPlayer,
-        rollsLeft,
-        phase: state.phase,
-        names: playerNames,
-        currentPlayer: state.currentPlayer,
-    });
-
     return (
         <div className="flex w-full flex-col items-center gap-6 px-4 pb-10">
-            <section className="w-full rounded-xl border border-white/20 bg-white/10 p-4 backdrop-blur">
-                <div ref={playersListRef} className="flex gap-3 overflow-x-auto pb-2">
-                    {playerNames.map((name, index) => {
-                        const status = playerStatuses[index] ?? { connected: false, ready: false };
-                        const isSelf = index === playerIndex;
-                        const isActive = index === state.currentPlayer;
-                        return (
-                            <div
-                                key={`${name}-${index}`}
-                                data-player-index={index}
-                                className={`player-chip flex min-w-[9rem] flex-shrink-0 flex-col gap-1 rounded-lg border border-orange-400/30 px-3 py-2 text-xs text-amber-100 shadow-sm transition-all ${isActive ? "bg-orange-500/40" : "bg-orange-500/10"}
-                                    ${isSelf ? "ring-1 ring-white/60" : ""}`}
-                            >
-                                <div className="flex items-center justify-between text-sm font-semibold text-amber-100">
-                                    <span>{isSelf ? "Du" : name || `Spieler ${index + 1}`}</span>
-                                    {isActive && <span>🎯</span>}
-                                </div>
-                                <div className="flex items-center justify-between text-[0.7rem] text-amber-100/70">
-                                    <span className={`flex items-center gap-1 ${status.connected ? "text-emerald-200" : "text-amber-200/50"}`}>
-                                        <span className={`h-2 w-2 rounded-full ${status.connected ? "bg-emerald-300" : "bg-amber-200/40"}`} />
-                                        {status.connected ? "Online" : "Offline"}
-                                    </span>
-                                    {state.phase === "setup" && <span>{status.ready ? "Bereit" : "Offen"}</span>}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-                <motion.p
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-2 text-sm text-amber-100/80"
-                >
-                    {statusMessage}
-                </motion.p>
-            </section>
 
             <CurrentPlayerIndicator
-                playerName={playerNames[state.currentPlayer] || `Player ${state.currentPlayer + 1}`}
+                playerName={playerNames[state.currentPlayer] || `Spieler ${state.currentPlayer + 1}`}
                 rollsLeft={rollsLeft}
             />
 
@@ -245,7 +168,6 @@ export function GameView({
                     }
                 }}
             />
-
             <Scoreboard
                 scoreSheets={state.scoreSheets}
                 playerNames={playerNames}

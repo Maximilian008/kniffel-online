@@ -1,2 +1,2 @@
-export { PlayerSetupNew as PlayerSetup, type SetupPlayer } from "../screens/Setup/PlayerSetupNew";
+export { SetupScreen as PlayerSetup, type SetupPlayer } from "../screens/Setup/SetupScreen";
 

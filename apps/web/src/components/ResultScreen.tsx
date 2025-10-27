@@ -1,7 +1,7 @@
 ﻿import type { SerializedGameState } from "../types/shared";
 import Scoreboard from "./Scoreboard";
 
-const DEFAULT_NAME = (i: number) => `Player ${i + 1}`;
+const DEFAULT_NAME = (i: number) => `Spieler ${i + 1}`;
 
 type Props = {
   state: SerializedGameState;
@@ -36,7 +36,7 @@ export default function ResultScreen({
             <span className="player-name">{names[0]}</span>
             <span className="final-score">{scores[0]}</span>
           </div>
-          <div className="vs-divider">VS</div>
+          <div className="vs-divider">Gegen</div>
           <div className={`score-card ${scores[1] > scores[0] ? 'winner' : scores[0] === scores[1] ? 'tie' : ''}`}>
             <span className="player-name">{names[1]}</span>
             <span className="final-score">{scores[1]}</span>

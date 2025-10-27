@@ -1,0 +1,232 @@
+:root {
+    --font-size: 16px;
+    --background: #2d1b3d;
+    --foreground: #fef3e8;
+    --card: rgba(255, 255, 255, 0.08);
+    --card-foreground: #fef3e8;
+    --popover: #3d2549;
+    --popover-foreground: #fef3e8;
+    --primary: #ff6900;
+    --primary-foreground: #381408;
+    --primary-rgb: 255, 105, 0;
+    --primary-soft: rgba(255, 105, 0, 0.16);
+    --secondary: rgba(255, 255, 255, 0.1);
+    --secondary-foreground: #fef3e8;
+    --muted: rgba(254, 243, 232, 0.7);
+    --muted-foreground: rgba(254, 243, 232, 0.85);
+    --accent: #c74e26;
+    --accent-foreground: #ffffff;
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --border: rgba(255, 255, 255, 0.12);
+    --input: transparent;
+    --input-background: rgba(255, 255, 255, 0.08);
+    --switch-background: rgba(255, 255, 255, 0.2);
+    --ring: #ff914d;
+    --radius: 1.25rem;
+    --font-weight-medium: 500;
+    --font-weight-normal: 400;
+    --chart-1: oklch(0.646 0.222 41.116);
+    --chart-2: oklch(0.6 0.118 184.704);
+    --chart-3: oklch(0.398 0.07 227.392);
+    --chart-4: oklch(0.828 0.189 84.429);
+    --chart-5: oklch(0.769 0.188 70.08);
+    --bg: #14100d;
+    --panel: #1b1410;
+    --surface: #20160f;
+    --text: #fef3e8;
+    --shadow: 0 24px 60px rgba(20, 16, 13, 0.4);
+    --success: #22c55e;
+    --danger: #ef4444;
+    --sticky-top: 0px;
+    --die-size: 3.5rem;
+
+    /* Autumn theme extras */
+    --autumn-plum: #2d1b3d;
+    --autumn-burnt-orange: #c74e26;
+    --autumn-amber: #f5a962;
+    --autumn-glow: #f97316;
+    --held-glow: #4ade80;
+
+    --autumn-button-bg: #ff6900;
+    --autumn-button-bg-hover: linear-gradient(90deg, #ff8a33, #ff6900);
+    --autumn-button-text: #b9481f;
+    --autumn-button-border: #ff6900;
+    --autumn-button-ring: rgba(255, 105, 0, 0.4);
+
+    --autumn-bottom-breath: clamp(80px, 10vh, 140px);
+
+    --autumn-setup-panel-bg: #dfd2ba;
+    --autumn-setup-panel-border: #efb88a;
+    --autumn-setup-panel-shadow: 0 8px 24px rgba(148, 87, 41, 0.25);
+    --autumn-setup-text: #7e2a0c;
+    --autumn-setup-heading: #6b3f23;
+    --autumn-setup-helper: #7a5134;
+    --autumn-setup-status: #7c5639;
+    --autumn-setup-empty-text: #6b2324;
+    --autumn-setup-card-bg: #ece4d6;
+    --autumn-setup-card-border: #d4ad95;
+    --autumn-setup-muted-border: #d8cbb8;
+    --autumn-setup-input-text: #4a2a16;
+    --autumn-setup-input-placeholder: #8f6a4d;
+    --autumn-setup-badge-text: #4a2a16;
+    --autumn-setup-badge-ready-bg: #eef6e2;
+    --autumn-setup-badge-ready-border: #b7cf9d;
+    --autumn-setup-badge-connected-bg: #fbe4c9;
+    --autumn-setup-badge-connected-border: #f0c79e;
+    --autumn-setup-badge-default-bg: #f4e6d4;
+    --autumn-setup-badge-default-border: #e0d0b6;
+
+    --autumn-menu-trigger-bg: rgba(255, 255, 255, 0.08);
+    --autumn-menu-trigger-bg-hover: rgba(255, 255, 255, 0.18);
+    --autumn-menu-trigger-border: rgba(255, 255, 255, 0.22);
+    --autumn-menu-trigger-icon: #fce3b3;
+    --autumn-menu-content-bg: #3d2549;
+    --autumn-menu-content-border: rgba(255, 255, 255, 0.22);
+    --autumn-menu-content-text: #fef3e8;
+    --autumn-menu-content-shadow: 0 20px 48px rgba(20, 16, 13, 0.45);
+    --autumn-menu-item-hover-bg: rgba(255, 255, 255, 0.12);
+    --autumn-menu-separator: rgba(255, 255, 255, 0.14);
+}
+
+.dark {
+    --background: #1a1126;
+    --foreground: #fcefe3;
+    --card: rgba(20, 16, 13, 0.65);
+    --card-foreground: #fcefe3;
+    --popover: rgba(20, 16, 13, 0.65);
+    --popover-foreground: #fcefe3;
+    --primary: #ffa166;
+    --primary-foreground: #2f1308;
+    --secondary: rgba(255, 255, 255, 0.08);
+    --secondary-foreground: #fcefe3;
+    --muted: rgba(255, 255, 255, 0.55);
+    --muted-foreground: rgba(255, 255, 255, 0.75);
+    --accent: #b64622;
+    --destructive: #f87171;
+    --border: rgba(255, 255, 255, 0.16);
+    --input-background: rgba(255, 255, 255, 0.1);
+    --switch-background: rgba(255, 255, 255, 0.25);
+    --ring: #ffb98a;
+    --shadow: 0 18px 48px rgba(5, 2, 1, 0.55);
+    --text: #fcefe3;
+    --bg: #120b1a;
+    --panel: #1a1126;
+    --surface: #22142e;
+
+    --autumn-button-bg: #ffa166;
+    --autumn-button-bg-hover: linear-gradient(90deg, #ffb482, #ffa166);
+    --autumn-button-text: #2f1308;
+    --autumn-button-border: #ffa166;
+    --autumn-button-ring: rgba(255, 161, 102, 0.4);
+
+    --autumn-setup-panel-bg: #2f2219;
+    --autumn-setup-panel-border: #c28758;
+    --autumn-setup-panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    --autumn-setup-text: #f7e0c0;
+    --autumn-setup-heading: #fcd6a8;
+    --autumn-setup-helper: #e3b98b;
+    --autumn-setup-status: #edc8a2;
+    --autumn-setup-empty-text: #f6a7a7;
+    --autumn-setup-card-bg: #3b2a1d;
+    --autumn-setup-card-border: #c28758;
+    --autumn-setup-muted-border: #7f6652;
+    --autumn-setup-input-text: #f7e0c0;
+    --autumn-setup-input-placeholder: #d3a980;
+    --autumn-setup-badge-text: #f7e0c0;
+    --autumn-setup-badge-ready-bg: #3f5532;
+    --autumn-setup-badge-ready-border: #6b8f4f;
+    --autumn-setup-badge-connected-bg: #5c3c1e;
+    --autumn-setup-badge-connected-border: #b4723d;
+    --autumn-setup-badge-default-bg: #443022;
+    --autumn-setup-badge-default-border: #986c4b;
+
+    --autumn-bottom-breath: clamp(80px, 10vh, 140px);
+
+    --autumn-menu-trigger-bg: rgba(255, 255, 255, 0.12);
+    --autumn-menu-trigger-bg-hover: rgba(255, 255, 255, 0.24);
+    --autumn-menu-trigger-border: rgba(255, 255, 255, 0.28);
+    --autumn-menu-trigger-icon: #ffe9c7;
+    --autumn-menu-content-bg: #291734;
+    --autumn-menu-content-border: rgba(255, 255, 255, 0.2);
+    --autumn-menu-content-text: #fde6d1;
+    --autumn-menu-content-shadow: 0 22px 48px rgba(5, 2, 1, 0.55);
+    --autumn-menu-item-hover-bg: rgba(255, 255, 255, 0.16);
+    --autumn-menu-separator: rgba(255, 255, 255, 0.18);
+}
+
+html {
+    font-size: var(--font-size);
+}
+
+body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: var(--font-weight-normal);
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    border-color: var(--border);
+    outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
+    color: inherit;
+}
+
+[data-slot="button"][data-variant="autumn"] {
+    background: var(--autumn-button-bg, var(--primary));
+    color: var(--autumn-button-text, var(--primary-foreground));
+    border-color: var(--autumn-button-border, var(--primary));
+    font-weight: 600;
+    transition: background 200ms ease-out;
+}
+
+[data-slot="button"][data-variant="autumn"]:hover {
+    background: var(--autumn-button-bg-hover, var(--autumn-button-bg, var(--primary)));
+}
+
+[data-slot="button"][data-variant="autumn"]:focus-visible {
+    box-shadow: 0 0 0 3px var(--autumn-button-ring, rgba(255, 105, 0, 0.4));
+}
+
+[data-slot="menu-trigger"] {
+    background-color: var(--autumn-menu-trigger-bg, rgba(255, 255, 255, 0.1));
+    color: var(--autumn-menu-trigger-icon, #fcdba2);
+    border-color: var(--autumn-menu-trigger-border, rgba(255, 255, 255, 0.2));
+    box-shadow: none;
+}
+
+[data-slot="menu-trigger"]:hover {
+    background-color: var(--autumn-menu-trigger-bg-hover, rgba(255, 255, 255, 0.2));
+}
+
+[data-slot="menu-content"] {
+    background-color: var(--autumn-menu-content-bg, #3d2549);
+    color: var(--autumn-menu-content-text, #fcefe3);
+    border-color: var(--autumn-menu-content-border, rgba(255, 255, 255, 0.2));
+    box-shadow: var(--autumn-menu-content-shadow, 0 16px 36px rgba(20, 16, 13, 0.45));
+    min-width: 12rem;
+    padding: 0.35rem;
+}
+
+[data-slot="menu-item"] {
+    border-radius: 0.6rem;
+    transition: background-color 150ms ease;
+}
+
+[data-slot="menu-item"]:hover {
+    background-color: var(--autumn-menu-item-hover-bg, rgba(255, 255, 255, 0.1));
+}
+
+[data-slot="menu-separator"] {
+    background-color: var(--autumn-menu-separator, rgba(255, 255, 255, 0.1));
+}

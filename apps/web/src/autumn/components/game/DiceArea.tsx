@@ -6,7 +6,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "../../ui/dropdown-menu";
-import { Die } from "./Die";
+import { Die } from "../dice/Die";
 
 type DiceAreaProps = {
     dice: number[];
@@ -77,17 +77,32 @@ export function DiceArea({
             </Button>
 
             <DropdownMenu>
-                <DropdownMenuTrigger className="rounded-lg border border-white/20 bg-white/10 p-2 transition-colors hover:bg-white/20">
-                    <MoreVertical className="h-5 w-5 text-amber-200" />
+                <DropdownMenuTrigger
+                    data-slot="menu-trigger"
+                    className="rounded-lg border p-2 transition-colors"
+                >
+                    <MoreVertical className="h-5 w-5" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="border border-white/20 bg-[#3d2549] text-amber-100">
-                    <DropdownMenuItem onClick={onShowHistory} className="cursor-pointer gap-2 hover:bg-white/10">
+                <DropdownMenuContent data-slot="menu-content" className="border rounded-xl text-sm">
+                    <DropdownMenuItem
+                        data-slot="menu-item"
+                        onClick={onShowHistory}
+                        className="cursor-pointer gap-2 px-3 py-2"
+                    >
                         <History className="h-4 w-4" /> Verlauf
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onReset} className="cursor-pointer gap-2 hover:bg-white/10">
+                    <DropdownMenuItem
+                        data-slot="menu-item"
+                        onClick={onReset}
+                        className="cursor-pointer gap-2 px-3 py-2"
+                    >
                         <RotateCcw className="h-4 w-4" /> Spiel zurücksetzen
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onToggleSound} className="cursor-pointer gap-2 hover:bg-white/10">
+                    <DropdownMenuItem
+                        data-slot="menu-item"
+                        onClick={onToggleSound}
+                        className="cursor-pointer gap-2 px-3 py-2"
+                    >
                         {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
                         {soundEnabled ? "Sound an" : "Sound aus"}
                     </DropdownMenuItem>

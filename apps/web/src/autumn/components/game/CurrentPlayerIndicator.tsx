@@ -25,11 +25,13 @@ export function CurrentPlayerIndicator({ playerName, rollsLeft }: CurrentPlayerI
                 className="inline-block"
             >
                 <h2 className="text-orange-300 drop-shadow-[0_2px_8px_rgba(251,146,60,0.8)]">
-                    {playerName ? `${playerName}'s Turn` : "Waiting for players"}
+                    {playerName ? `Am Zug: ${playerName}` : "Warten auf Mitspieler"}
                 </h2>
             </motion.div>
             <p className="mt-1 text-amber-200/70">
-                {rollsLeft === 3 ? "Roll to start" : `${rollsLeft} roll${rollsLeft !== 1 ? "s" : ""} remaining`}
+                {rollsLeft === 3
+                    ? "Zum Start würfeln"
+                    : `Noch ${rollsLeft} ${rollsLeft === 1 ? "Wurf" : "Würfe"} übrig`}
             </p>
         </motion.div>
     );

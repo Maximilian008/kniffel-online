@@ -13,8 +13,8 @@ const CATEGORY_LABELS: Record<Category, string> = {
   fours: "Vierer",
   fives: "Fünfer",
   sixes: "Sechser",
-  threeKind: "Dreierpasch",
-  fourKind: "Viererpasch",
+  threeKind: "Dreier Pasch",
+  fourKind: "Vierer Pasch",
   fullHouse: "Full House",
   smallStraight: "Kleine Straße",
   largeStraight: "Große Straße",
@@ -129,12 +129,12 @@ export default function Scoreboard({
   const currentLabel = useMemo(() => {
     if (visibleIndexes.length > 0) {
       return visibleIndexes
-        .map((index) => playerNames[index] ?? `Player ${index + 1}`)
+        .map((index) => playerNames[index] ?? `Spieler ${index + 1}`)
         .join(" & ");
     }
     return playerNames
       .slice(0, Math.min(2, playerCount))
-      .map((name, idx) => name ?? `Player ${idx + 1}`)
+      .map((name, idx) => name ?? `Spieler ${idx + 1}`)
       .join(" & ");
   }, [playerCount, playerNames, visibleIndexes]);
 
@@ -155,7 +155,7 @@ export default function Scoreboard({
     const nextStart = visibleStart + 1 > maxStart ? 0 : visibleStart + 1;
     const indexes = [nextStart, nextStart + 1].filter((value) => value < playerCount);
     return indexes
-      .map((index) => playerNames[index] ?? `Player ${index + 1}`)
+      .map((index) => playerNames[index] ?? `Spieler ${index + 1}`)
       .join(" & ");
   }, [playerCount, playerNames, showCycleControl, visibleStart]);
   const usedSets = useMemo(() => state.usedCategories.map((list: Category[]) => new Set(list)), [state.usedCategories]) as Array<Set<Category>>;
@@ -190,7 +190,7 @@ export default function Scoreboard({
       const delta = (tr.left + tr.width / 2) - (cr.left + cr.width / 2);
       container.scrollLeft += delta;
     }
-      }, [isCompact, state.currentPlayer, activeIndex]);
+  }, [isCompact, state.currentPlayer, activeIndex]);
 
   return (
     <section className="scoreboard-section" aria-label="Punktetafel">
@@ -202,20 +202,20 @@ export default function Scoreboard({
         <table className="scoreboard-table">
           <thead>
             <tr>
-              <th>Category</th>
+              <th>Kategorie</th>
               {visibleIndexes.map((playerIndex) => (
                 <th
                   key={playerIndex}
                   className={`player-head ${state.currentPlayer === playerIndex ? "active-player" : ""}`}
                 >
-                  {playerNames[playerIndex] ?? `Player ${playerIndex + 1}`}
+                  {playerNames[playerIndex] ?? `Spieler ${playerIndex + 1}`}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             <tr className="section-row">
-              <td colSpan={visibleIndexes.length + 1}>Upper section</td>
+              <td colSpan={visibleIndexes.length + 1}>Oberer Bereich</td>
             </tr>
             {UPPER.map((category) => (
               <ScoreRow
@@ -231,19 +231,19 @@ export default function Scoreboard({
               />
             ))}
             <tr className="summary-row">
-              <td>Subtotal</td>
+              <td>Zwischensumme</td>
               {visibleIndexes.map((playerIndex) => (
                 <td key={playerIndex}>{upperTotals[playerIndex] ?? 0}</td>
               ))}
             </tr>
             <tr className="summary-row">
-              <td>Bonus (63+)</td>
+              <td>Bonus (≥63)</td>
               {visibleIndexes.map((playerIndex) => (
                 <td key={playerIndex}>{bonuses[playerIndex] ?? 0}</td>
               ))}
             </tr>
             <tr className="section-row">
-              <td colSpan={visibleIndexes.length + 1}>Lower section</td>
+              <td colSpan={visibleIndexes.length + 1}>Unterer Bereich</td>
             </tr>
             {LOWER.map((category) => (
               <ScoreRow
@@ -259,7 +259,7 @@ export default function Scoreboard({
               />
             ))}
             <tr className="summary-row total">
-              <td>Total score</td>
+              <td>Gesamtpunkte</td>
               {visibleIndexes.map((playerIndex) => (
                 <td key={playerIndex}>{finalTotals[playerIndex] ?? 0}</td>
               ))}

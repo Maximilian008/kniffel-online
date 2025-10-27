@@ -31,21 +31,21 @@ type GameHistoryProps = {
 };
 
 const UPPER: Array<{ key: Category; label: string }> = [
-    { key: "ones", label: "Ones" },
-    { key: "twos", label: "Twos" },
-    { key: "threes", label: "Threes" },
-    { key: "fours", label: "Fours" },
-    { key: "fives", label: "Fives" },
-    { key: "sixes", label: "Sixes" },
+    { key: "ones", label: "Einser" },
+    { key: "twos", label: "Zweier" },
+    { key: "threes", label: "Dreier" },
+    { key: "fours", label: "Vierer" },
+    { key: "fives", label: "Fünfer" },
+    { key: "sixes", label: "Sechser" },
 ];
 
 const LOWER: Array<{ key: Category; label: string }> = [
-    { key: "threeKind", label: "3 of a Kind" },
-    { key: "fourKind", label: "4 of a Kind" },
+    { key: "threeKind", label: "Dreier Pasch" },
+    { key: "fourKind", label: "Vierer Pasch" },
     { key: "fullHouse", label: "Full House" },
-    { key: "smallStraight", label: "Sm. Straight" },
-    { key: "largeStraight", label: "Lg. Straight" },
-    { key: "yahtzee", label: "Yahtzee" },
+    { key: "smallStraight", label: "Kleine Straße" },
+    { key: "largeStraight", label: "Große Straße" },
+    { key: "yahtzee", label: "Kniffel" },
     { key: "chance", label: "Chance" },
 ];
 
@@ -83,7 +83,8 @@ export function GameHistory({ isOpen, onClose, history, onRefresh, isLoading }: 
                             variant="secondary"
                             size="sm"
                             onClick={onRefresh}
-                            className="bg-white/60 text-orange-900 hover:bg-white"
+                            className="bg-white/60 hover:bg-white"
+                            style={{ color: "var(--autumn-button-text, #b9481f)" }}
                             disabled={isLoading}
                         >
                             <RefreshCw className="mr-2 h-4 w-4" /> Aktualisieren

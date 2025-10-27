@@ -21,18 +21,18 @@ type ScoreCategory = {
 };
 
 const SCOREBOARD_CATEGORIES: ScoreCategory[] = [
-    { key: "ones", name: "Ones", section: "upper" },
-    { key: "twos", name: "Twos", section: "upper" },
-    { key: "threes", name: "Threes", section: "upper" },
-    { key: "fours", name: "Fours", section: "upper" },
-    { key: "fives", name: "Fives", section: "upper" },
-    { key: "sixes", name: "Sixes", section: "upper" },
-    { key: "threeKind", name: "3 of a Kind", section: "lower" },
-    { key: "fourKind", name: "4 of a Kind", section: "lower" },
+    { key: "ones", name: "Einser", section: "upper" },
+    { key: "twos", name: "Zweier", section: "upper" },
+    { key: "threes", name: "Dreier", section: "upper" },
+    { key: "fours", name: "Vierer", section: "upper" },
+    { key: "fives", name: "Fünfer", section: "upper" },
+    { key: "sixes", name: "Sechser", section: "upper" },
+    { key: "threeKind", name: "Dreier Pasch", section: "lower" },
+    { key: "fourKind", name: "Vierer Pasch", section: "lower" },
     { key: "fullHouse", name: "Full House", section: "lower" },
-    { key: "smallStraight", name: "Sm. Straight", section: "lower" },
-    { key: "largeStraight", name: "Lg. Straight", section: "lower" },
-    { key: "yahtzee", name: "Yahtzee", section: "lower" },
+    { key: "smallStraight", name: "Kleine Straße", section: "lower" },
+    { key: "largeStraight", name: "Große Straße", section: "lower" },
+    { key: "yahtzee", name: "Kniffel", section: "lower" },
     { key: "chance", name: "Chance", section: "lower" },
 ];
 
@@ -64,7 +64,7 @@ export function Scoreboard({
 
     const players = useMemo(() => {
         return scoreSheets.map((sheet, index) => ({
-            name: playerNames[index] ?? `Player ${index + 1}`,
+            name: playerNames[index] ?? `Spieler ${index + 1}`,
             sheet,
         }));
     }, [playerNames, scoreSheets]);
@@ -76,12 +76,20 @@ export function Scoreboard({
 
     useEffect(() => {
         if (players.length <= maxVisiblePlayers) return;
-        if (currentPlayerIndex < viewStartIndex) {
-            setViewStartIndex(currentPlayerIndex);
-        } else if (currentPlayerIndex >= viewStartIndex + maxVisiblePlayers) {
-            setViewStartIndex(Math.max(0, currentPlayerIndex - maxVisiblePlayers + 1));
-        }
-    }, [currentPlayerIndex, players.length, viewStartIndex]);
+
+        setViewStartIndex((previous) => {
+            let next = previous;
+
+            if (currentPlayerIndex < previous) {
+                next = currentPlayerIndex;
+            } else if (currentPlayerIndex >= previous + maxVisiblePlayers) {
+                next = Math.max(0, currentPlayerIndex - maxVisiblePlayers + 1);
+            }
+
+            const maxStart = Math.max(0, players.length - maxVisiblePlayers);
+            return Math.min(next, maxStart);
+        });
+    }, [currentPlayerIndex, players.length, maxVisiblePlayers]);
 
     const handleCategorySelect = (key: Category) => {
         if (!onCategoryClick) return;

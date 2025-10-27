@@ -2,6 +2,7 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
+import { withAutumnButtonVars } from "../theme/tokens";
 import { cn } from "./utils";
 
 const buttonVariants = cva(
@@ -20,7 +21,7 @@ const buttonVariants = cva(
                     "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
                 link: "text-primary underline-offset-4 hover:underline",
                 autumn:
-                    "bg-[#FF6900] text-[#B9481F] font-semibold border border-[#ff6900] transition-[background] duration-200 ease-out hover:bg-[linear-gradient(90deg,#ff8a33,#ff6900)] focus-visible:ring-[#ff6900]/40",
+                    "border font-semibold transition-[background] duration-200 ease-out",
             },
             size: {
                 default: "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -41,17 +42,22 @@ function Button({
     variant,
     size,
     asChild = false,
+    style,
     ...props
 }: React.ComponentProps<"button"> &
     VariantProps<typeof buttonVariants> & {
         asChild?: boolean;
     }) {
     const Comp = asChild ? Slot : "button";
+    const resolvedStyle =
+        variant === "autumn" ? withAutumnButtonVars(style) : style;
 
     return (
         <Comp
             data-slot="button"
+            data-variant={variant ?? "default"}
             className={cn(buttonVariants({ variant, size, className }))}
+            style={resolvedStyle}
             {...props}
         />
     );

@@ -4,8 +4,8 @@ import { StatusToast } from "./autumn/components/common/StatusToast";
 import { TopBar } from "./autumn/components/common/TopBar";
 import { FinishedView } from "./autumn/screens/Game/FinishedView";
 import { GameView, type PlayerStatus } from "./autumn/screens/Game/GameView";
-import { GameHistory } from "./autumn/screens/History/GameHistory";
-import { PlayerSetupNew, type SetupPlayer } from "./autumn/screens/Setup/PlayerSetupNew";
+import { HistoryModal } from "./autumn/screens/History/HistoryModal";
+import { SetupScreen, type SetupPlayer } from "./autumn/screens/Setup/SetupScreen";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -73,7 +73,7 @@ const historyFormatter = new Intl.DateTimeFormat("de-DE", {
 });
 
 function defaultName(index: PlayerIndex) {
-    return `Player ${index + 1}`;
+    return `Spieler ${index + 1}`;
 }
 
 function calculateFinalScore(sheet: Record<Category, number | undefined>) {
@@ -603,7 +603,7 @@ export default function App() {
         if (!gameState || gameState.phase === "setup") {
             return (
                 <div className="flex flex-1 items-center justify-center p-4">
-                    <PlayerSetupNew
+                    <SetupScreen
                         playerCount={playerCount}
                         onPlayerCountChange={handlePlayerCountChange}
                         localName={localNameDraft}
@@ -637,7 +637,6 @@ export default function App() {
                     onChooseCategory={handleChoose}
                     onReset={handleReset}
                     onOpenHistory={handleShowHistory}
-                    playerStatuses={playerStatuses}
                     soundEnabled={soundEnabled}
                     onToggleSound={(enabled) => {
                         setSoundEnabled(enabled);
@@ -699,13 +698,13 @@ export default function App() {
                     connectionHint={topBarHint}
                 />
 
-                <main className="flex flex-1 flex-col items-center">
+                <main className="flex flex-1 flex-col items-center pb-[calc(var(--autumn-bottom-breath)+env(safe-area-inset-bottom,0px))]">
                     {phaseContent}
                 </main>
 
                 <StatusToast message={toastMessage} isVisible={Boolean(toastMessage)} />
 
-                <GameHistory
+                <HistoryModal
                     isOpen={historyOpen}
                     onClose={handleCloseHistory}
                     history={historyGames}
@@ -727,7 +726,7 @@ export default function App() {
                 <AlertDialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
                     <AlertDialogContent className="border-2 border-orange-500/30 bg-[#3d2549] text-amber-100">
                         <AlertDialogHeader>
-                            <AlertDialogTitle className="text-orange-300">How to Play 🎲</AlertDialogTitle>
+                            <AlertDialogTitle className="text-orange-300">So wird gespielt 🎲</AlertDialogTitle>
                             <AlertDialogDescription className="text-amber-100/90">
                                 Erziele die meisten Punkte, indem du clevere Würfelkombinationen wählst.
                             </AlertDialogDescription>

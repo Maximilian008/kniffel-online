@@ -60,7 +60,7 @@ export default function HistoryPanel({ history, onClose, onRefresh }: Props) {
                 const name = entry.playerNames[index]?.trim() || fallbackName;
                 const score = entry.scores[index] ?? 0;
                 return `${name} (${score})`;
-              }).join(" vs. ");
+              }).join(" gegen ");
               const winnerText = entry.winner === "Draw" ? "Unentschieden" : entry.winner;
 
               return (

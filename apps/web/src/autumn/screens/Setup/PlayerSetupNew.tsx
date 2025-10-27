@@ -108,7 +108,7 @@ function lobbyBadgeText(ready: boolean, connected: boolean) {
         return "Offen";
     }
 
-    return "Offline";
+    return "Nicht verbunden";
 }
 
 export function PlayerSetupNew({
@@ -150,7 +150,7 @@ export function PlayerSetupNew({
         <div className="flex min-h-screen w-full items-center justify-center px-4 py-10 text-[#7E2A0C]">
             <div style={panelStyle}>
                 <header style={{ marginBottom: "2rem", textAlign: "center" }}>
-                    <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Setup Game</h2>
+                    <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Spiel vorbereiten</h2>
                 </header>
 
                 <div style={sectionStackStyle}>
@@ -262,7 +262,7 @@ export function PlayerSetupNew({
                                                         {player.isSelf ? `${resolvedName} (Du)` : resolvedName}
                                                     </span>
                                                     <span style={{ fontSize: "0.75rem", color: "#7A5134" }}>
-                                                        {connected ? "Verbunden" : "Offline"}
+                                                        {connected ? "Verbunden" : "Nicht verbunden"}
                                                     </span>
                                                 </div>
                                                 <span

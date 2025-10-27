@@ -88,13 +88,13 @@ export default function RoleSelectModal({
         return {
           role,
           disabled: !trimmed,
-          description: slot.connected ? "Bereits verbunden" : "Reserviert fuer dich",
+          description: slot.connected ? "Bereits verbunden" : "Reserviert für dich",
           countdown,
           isReservedForYou: true,
         } satisfies RoleEntry;
       }
 
-      const connectionStatus = slot.connected ? "online" : "offline";
+      const connectionStatus = slot.connected ? "verbunden" : "nicht verbunden";
       return {
         role,
         disabled: true,
@@ -115,14 +115,14 @@ export default function RoleSelectModal({
         <header className="modal-header">
           <h2>Wer bist du?</h2>
           {trimmed && (
-            <button className="modal-close" onClick={onClose} aria-label="Fenster schliessen">
+            <button className="modal-close" onClick={onClose} aria-label="Fenster schließen">
               x
             </button>
           )}
         </header>
         <p className="modal-description">
           Reserviere eine Rolle und gib deinen Anzeigenamen ein. Wenn du bereits gespielt hast,
-          waehle dieselbe Kombination, um sofort wieder einzusteigen.
+          wähle dieselbe Kombination, um sofort wieder einzusteigen.
         </p>
         {status && (
           <p className="modal-hint" style={{ marginTop: 4, marginBottom: 8, color: '#666' }}>
