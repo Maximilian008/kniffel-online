@@ -35,8 +35,8 @@ export function Die({ value, held, onToggle, disabled }: DieProps) {
             onClick={onToggle}
             disabled={disabled}
             className={`relative h-16 w-16 rounded-lg transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 md:h-20 md:w-20 ${held
-                    ? "animate-pulse bg-green-500 shadow-[0_0_20px_4px_rgba(74,222,128,0.6)]"
-                    : "bg-white shadow-lg hover:shadow-xl"
+                ? "bg-green-500 shadow-[0_0_20px_4px_rgba(74,222,128,0.6)]"
+                : "bg-white shadow-lg hover:shadow-xl"
                 }`}
             whileHover={!disabled ? { scale: 1.05 } : undefined}
             whileTap={!disabled ? { scale: 0.95 } : undefined}

@@ -7,11 +7,11 @@ export function AnimatedBackground() {
                 className="absolute inset-0"
                 animate={{
                     background: [
-                        "radial-gradient(ellipse at 20% 50%, #2d1b3d 0%, #c74e26 50%, #f5a962 100%)",
-                        "radial-gradient(ellipse at 80% 50%, #2d1b3d 0%, #c74e26 50%, #f5a962 100%)",
-                        "radial-gradient(ellipse at 50% 80%, #2d1b3d 0%, #c74e26 50%, #f5a962 100%)",
-                        "radial-gradient(ellipse at 50% 20%, #2d1b3d 0%, #c74e26 50%, #f5a962 100%)",
-                        "radial-gradient(ellipse at 20% 50%, #2d1b3d 0%, #c74e26 50%, #f5a962 100%)",
+                        "radial-gradient(ellipse at 20% 50%, #9e0c0cff 0%, #c74e26 50%, #f5a962 100%)",
+                        "radial-gradient(ellipse at 80% 50%, #9e0c0cff 0%, #c74e26 50%, #f5a962 100%)",
+                        "radial-gradient(ellipse at 50% 80%, #9e0c0cff 0%, #c74e26 50%, #f5a962 100%)",
+                        "radial-gradient(ellipse at 50% 20%, #9e0c0cff 0%, #c74e26 50%, #f5a962 100%)",
+                        "radial-gradient(ellipse at 20% 50%, #9e0c0cff 0%, #c74e26 50%, #f5a962 100%)",
                     ],
                 }}
                 transition={{

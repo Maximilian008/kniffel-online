@@ -1,28 +1,17 @@
 import { Calendar, ChevronDown, ChevronUp, RefreshCw, Trophy } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import type { Category } from "../../../types/shared";
 import { Button } from "../../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../ui/dialog";
 import { ScrollArea } from "../../ui/scroll-area";
+import type { HistoryGame } from "./history-utils";
+import { CompactScoreboard } from "./history-utils";
 
-type PlayerScoreMap = Record<Category, number | null>;
+const buttonTextColor = "#6b3f23";
+const buttonSubTextColor = "#85603a";
+const winnerAccentColor = "#b45f16";
 
-type HistoryPlayer = {
-    name: string;
-    scores: PlayerScoreMap;
-    total: number;
-};
-
-type HistoryGame = {
-    id: string;
-    date: string;
-    players: HistoryPlayer[];
-    winner: string;
-    winnerScore: number;
-};
-
-type HistoryModalProps = {
+export type HistoryModalProps = {
     isOpen: boolean;
     onClose: () => void;
     history: HistoryGame[];
@@ -30,39 +19,14 @@ type HistoryModalProps = {
     isLoading?: boolean;
 };
 
-const UPPER: Array<{ key: Category; label: string }> = [
-    { key: "ones", label: "Einser" },
-    { key: "twos", label: "Zweier" },
-    { key: "threes", label: "Dreier" },
-    { key: "fours", label: "Vierer" },
-    { key: "fives", label: "Fünfer" },
-    { key: "sixes", label: "Sechser" },
-];
-
-const LOWER: Array<{ key: Category; label: string }> = [
-    { key: "threeKind", label: "Dreier Pasch" },
-    { key: "fourKind", label: "Vierer Pasch" },
-    { key: "fullHouse", label: "Full House" },
-    { key: "smallStraight", label: "Kleine Straße" },
-    { key: "largeStraight", label: "Große Straße" },
-    { key: "yahtzee", label: "Kniffel" },
-    { key: "chance", label: "Chance" },
-];
-
-function upperSubtotal(scores: PlayerScoreMap) {
-    return UPPER.reduce((total, category) => total + (scores[category.key] ?? 0), 0);
-}
-
-function bonus(scores: PlayerScoreMap) {
-    return upperSubtotal(scores) >= 63 ? 35 : 0;
-}
-
 export function HistoryModal({ isOpen, onClose, history, onRefresh, isLoading }: HistoryModalProps) {
     const [expandedGameId, setExpandedGameId] = useState<string | null>(null);
 
     const toggleExpanded = (gameId: string) => {
         setExpandedGameId((previous) => (previous === gameId ? null : gameId));
     };
+
+    const hasExpandedGame = expandedGameId !== null;
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -106,6 +70,9 @@ export function HistoryModal({ isOpen, onClose, history, onRefresh, isLoading }:
                         )}
                         {!isLoading && history.map((game) => {
                             const isExpanded = expandedGameId === game.id;
+                            if (hasExpandedGame && !isExpanded) {
+                                return null;
+                            }
                             return (
                                 <div
                                     key={game.id}
@@ -114,24 +81,29 @@ export function HistoryModal({ isOpen, onClose, history, onRefresh, isLoading }:
                                     <button
                                         type="button"
                                         onClick={() => toggleExpanded(game.id)}
-                                        className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-orange-900 transition-colors hover:bg-white/70"
+                                        className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-white/70"
+                                        style={{ color: buttonTextColor }}
                                     >
                                         <div className="flex flex-1 flex-col gap-1 sm:flex-row sm:items-center">
-                                            <div className="flex items-center gap-2 text-sm text-orange-900/70">
+                                            <div className="flex items-center gap-2 text-sm" style={{ color: buttonSubTextColor }}>
                                                 <Calendar className="h-4 w-4" />
                                                 <span>{game.date}</span>
                                             </div>
-                                            <div className="flex items-center gap-2 text-sm sm:ml-6">
+                                            <div className="flex items-center gap-2 text-sm sm:ml-6" style={{ color: buttonSubTextColor }}>
                                                 <Trophy className="h-4 w-4 text-amber-600" />
                                                 <span>
-                                                    {game.winner} gewann mit <span className="font-semibold text-orange-700">{game.winnerScore}</span> Punkten
+                                                    {game.winner} gewann mit {" "}
+                                                    <span className="font-semibold" style={{ color: winnerAccentColor }}>
+                                                        {game.winnerScore}
+                                                    </span>{" "}
+                                                    Punkten
                                                 </span>
                                             </div>
                                         </div>
                                         {isExpanded ? (
-                                            <ChevronUp className="h-5 w-5 text-orange-900" />
+                                            <ChevronUp className="h-5 w-5" style={{ color: buttonTextColor }} />
                                         ) : (
-                                            <ChevronDown className="h-5 w-5 text-orange-900" />
+                                            <ChevronDown className="h-5 w-5" style={{ color: buttonTextColor }} />
                                         )}
                                     </button>
 
@@ -145,79 +117,7 @@ export function HistoryModal({ isOpen, onClose, history, onRefresh, isLoading }:
                                                 className="overflow-hidden border-t border-orange-800/20"
                                             >
                                                 <div className="px-4 py-3">
-                                                    <div className="overflow-x-auto rounded-lg bg-white/70">
-                                                        <table className="w-full border-collapse text-sm text-orange-900">
-                                                            <thead>
-                                                                <tr className="border-b-2 border-orange-600/40 bg-gradient-to-r from-[#c9a87c] to-[#b89968]">
-                                                                    <th className="p-2 text-left">Kategorie</th>
-                                                                    {game.players.map((player, index) => (
-                                                                        <th key={index} className="p-2 text-center">
-                                                                            {player.name}
-                                                                            {player.name === game.winner && (
-                                                                                <Trophy className="ml-1 inline-block h-3 w-3 text-amber-600" />
-                                                                            )}
-                                                                        </th>
-                                                                    ))}
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                <tr className="bg-orange-700/20 text-xs uppercase tracking-wider">
-                                                                    <td className="p-2" colSpan={game.players.length + 1}>
-                                                                        Oberer Bereich
-                                                                    </td>
-                                                                </tr>
-                                                                {UPPER.map((category) => (
-                                                                    <tr key={category.key} className="border-b border-orange-800/10">
-                                                                        <td className="p-2">{category.label}</td>
-                                                                        {game.players.map((player, index) => (
-                                                                            <td key={index} className="p-2 text-center">
-                                                                                {player.scores[category.key] ?? "-"}
-                                                                            </td>
-                                                                        ))}
-                                                                    </tr>
-                                                                ))}
-                                                                <tr className="bg-[#c9a87c]/40">
-                                                                    <td className="p-2">Zwischensumme</td>
-                                                                    {game.players.map((player, index) => (
-                                                                        <td key={index} className="p-2 text-center">
-                                                                            {upperSubtotal(player.scores)}
-                                                                        </td>
-                                                                    ))}
-                                                                </tr>
-                                                                <tr className="bg-[#c9a87c]/40 border-b border-orange-800/20">
-                                                                    <td className="p-2">Bonus (≥63)</td>
-                                                                    {game.players.map((player, index) => (
-                                                                        <td key={index} className="p-2 text-center">
-                                                                            {bonus(player.scores) || "-"}
-                                                                        </td>
-                                                                    ))}
-                                                                </tr>
-                                                                <tr className="bg-orange-700/20 text-xs uppercase tracking-wider">
-                                                                    <td className="p-2" colSpan={game.players.length + 1}>
-                                                                        Unterer Bereich
-                                                                    </td>
-                                                                </tr>
-                                                                {LOWER.map((category) => (
-                                                                    <tr key={category.key} className="border-b border-orange-800/10">
-                                                                        <td className="p-2">{category.label}</td>
-                                                                        {game.players.map((player, index) => (
-                                                                            <td key={index} className="p-2 text-center">
-                                                                                {player.scores[category.key] ?? "-"}
-                                                                            </td>
-                                                                        ))}
-                                                                    </tr>
-                                                                ))}
-                                                                <tr className="bg-gradient-to-r from-orange-700/30 to-amber-700/30">
-                                                                    <td className="p-2 font-semibold">Gesamt</td>
-                                                                    {game.players.map((player, index) => (
-                                                                        <td key={index} className="p-2 text-center font-semibold">
-                                                                            {player.total}
-                                                                        </td>
-                                                                    ))}
-                                                                </tr>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
+                                                    <CompactScoreboard game={game} />
                                                 </div>
                                             </motion.div>
                                         )}
