@@ -6,7 +6,6 @@ import { FinishedView } from "./autumn/screens/Game/FinishedView";
 import { GameView, type PlayerStatus } from "./autumn/screens/Game/GameView";
 import { HistoryModal } from "./autumn/screens/History/HistoryModal";
 import { SetupScreen, type SetupPlayer } from "./autumn/screens/Setup/SetupScreen";
-import { StartScreen as Autumn2StartScreen } from "./autumn2/screens/Start/StartScreen";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -16,6 +15,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "./autumn/ui/alert-dialog";
+import { StartScreen as Autumn2StartScreen } from "./autumn2/screens/Start/StartScreen";
 import RoleSelectModal from "./components/RoleSelectModal";
 import { usePlayerIdentity } from "./hooks/usePlayerIdentity";
 import {
