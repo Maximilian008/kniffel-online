@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import "../../styles/theme.css";
 
 import { Button } from "../../../autumn/ui/button";
 import { Input } from "../../../autumn/ui/input";
 import { useIdentity } from "../../hooks/useIdentity";
+import { useRoom } from "../../hooks/useRoom";
 
 type TabKey = "host" | "join";
 
@@ -20,22 +21,53 @@ function formatJoinCode(value: string) {
 
 export function StartScreen() {
     const { displayName, setDisplayName } = useIdentity();
+    const { create, join, rejoin, state: roomState } = useRoom();
     const [activeTab, setActiveTab] = useState<TabKey>("host");
     const [playerCount, setPlayerCount] = useState<number>(4);
     const [joinCode, setJoinCode] = useState<string>("");
+    const [created, setCreated] = useState<
+        | null
+        | {
+              roomId: string;
+              code: string;
+              inviteToken: string;
+          }
+    >(null);
+    const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+    const [lastRoomId, setLastRoomId] = useState<string | null>(null);
 
     const formattedJoinCode = useMemo(() => formatJoinCode(joinCode), [joinCode]);
+    const inviteUrl = useMemo(() => {
+        if (!created) return "";
+        const params = new URLSearchParams({ room: created.roomId, t: created.inviteToken });
+        return `${window.location.origin}/?${params.toString()}`;
+    }, [created]);
 
-    function handleNameSubmit(event: React.FormEvent<HTMLFormElement>) {
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        try {
+            const stored = window.localStorage.getItem("yahtzee.lastRoomId");
+            setLastRoomId(stored && stored.length > 0 ? stored : null);
+        } catch {
+            setLastRoomId(null);
+        }
+    }, [created]);
+
+    async function handleNameSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const name = (displayName ?? "").trim();
-        console.log("create", { name, playerCount });
+        if (!name) return;
+        const result = await create({ name, playerCount });
+        setCreated(result);
+        setCopyStatus("idle");
     }
 
-    function handleJoinSubmit(event: React.FormEvent<HTMLFormElement>) {
+    async function handleJoinSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const code = formatJoinCode(joinCode).toUpperCase();
-        console.log("join", { code });
+        if (!code) return;
+        const { roomId } = await join({ code });
+        console.log("joined", roomId);
     }
 
     function handleJoinCodeChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -53,6 +85,25 @@ export function StartScreen() {
     }
 
     const nameValue = displayName ?? "";
+    const isCreating = roomState === "creating";
+    const isJoining = roomState === "joining";
+
+    async function handleCopy() {
+        if (!inviteUrl) return;
+        try {
+            await navigator.clipboard.writeText(inviteUrl);
+            setCopyStatus("copied");
+            setTimeout(() => setCopyStatus("idle"), 2000);
+        } catch {
+            setCopyStatus("idle");
+        }
+    }
+
+    async function handleResume() {
+        if (!lastRoomId) return;
+        await rejoin({ roomId: lastRoomId });
+        console.log("rejoined", lastRoomId);
+    }
 
     return (
         <div className="flex w-full flex-1 justify-center px-4 py-10" style={{ backgroundColor: "var(--a2-bg)" }}>
@@ -203,8 +254,9 @@ export function StartScreen() {
                                     backgroundImage: "linear-gradient(90deg, var(--a2-accent), var(--a2-accent-hover-to))",
                                     boxShadow: "0 16px 40px -20px var(--a2-shadow-warm)",
                                 }}
+                                disabled={isCreating}
                             >
-                                Spiel erstellen
+                                {isCreating ? "Erstelle Lobby..." : "Spiel erstellen"}
                             </Button>
                             <p className="text-xs sm:text-sm" style={{ color: "var(--a2-text-muted)" }}>
                                 Deine Spieler-ID bleibt erhalten: perfekte Grundlage für Serien.
@@ -263,7 +315,7 @@ export function StartScreen() {
                                         boxShadow: "0 16px 40px -20px var(--a2-shadow-warm)",
                                     }}
                                 >
-                                    Beitreten
+                                    {isJoining ? "Beitritt läuft..." : "Beitreten"}
                                 </Button>
                                 <Button
                                     type="button"
@@ -295,8 +347,73 @@ export function StartScreen() {
                         color: "var(--a2-text-muted)",
                     }}
                 >
-                    Letztes Spiel fortsetzen – kommt bald.
+                    {lastRoomId ? (
+                        <Button
+                            type="button"
+                            variant="autumn"
+                            className="w-full py-2 text-sm font-semibold text-white sm:w-auto"
+                            style={{
+                                backgroundImage: "linear-gradient(90deg, var(--a2-accent), var(--a2-accent-hover-to))",
+                                boxShadow: "0 12px 28px -18px var(--a2-shadow-warm)",
+                            }}
+                            onClick={handleResume}
+                        >
+                            Letztes Spiel fortsetzen
+                        </Button>
+                    ) : (
+                        "Letztes Spiel fortsetzen – kommt bald."
+                    )}
                 </footer>
+
+                {created && (
+                    <section
+                        className="flex flex-col gap-4 rounded-2xl p-6"
+                        style={{
+                            border: "1px solid color-mix(in srgb, var(--a2-accent) 22%, transparent)",
+                            backgroundColor: "color-mix(in srgb, white 80%, var(--a2-panel) 20%)",
+                            color: "var(--a2-text-primary)",
+                        }}
+                    >
+                        <div className="space-y-1">
+                            <h2 className="text-lg font-semibold">Einladung teilen</h2>
+                            <p className="text-sm" style={{ color: "var(--a2-text-muted)" }}>
+                                Lade Mitspieler per Link oder Code ein.
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-1 items-center gap-3 rounded-xl border px-3 py-2" style={{ borderColor: "color-mix(in srgb, var(--a2-accent) 20%, transparent)" }}>
+                                <div className="flex-1 truncate text-sm" title={inviteUrl}>
+                                    {inviteUrl}
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleCopy}
+                                    className="text-sm"
+                                >
+                                    {copyStatus === "copied" ? "Kopiert" : "Link kopieren"}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="text-3xl font-bold tracking-[0.4em]" aria-label="Spielcode">
+                                {created.code}
+                            </div>
+                            <div
+                                className="flex h-32 w-32 items-center justify-center rounded-xl border"
+                                style={{ borderColor: "color-mix(in srgb, var(--a2-accent) 18%, transparent)" }}
+                                aria-hidden="true"
+                            >
+                                {/* TODO: QR-Code Integration */}
+                                <span className="text-xs" style={{ color: "var(--a2-text-muted)" }}>
+                                    QR
+                                </span>
+                            </div>
+                        </div>
+                    </section>
+                )}
             </div>
         </div>
     );
@@ -312,3 +429,4 @@ export function StartScreen() {
 // #f0ad43 → var(--a2-accent-hover-to)
 // rgba(120,60,15,0.6) → var(--a2-shadow-warm)
 // #9f6644 → var(--a2-placeholder)
+// SharePanel zeigt Link (Invite-URL), großen Code und QR-Stub.
