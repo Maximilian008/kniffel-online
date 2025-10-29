@@ -88,6 +88,7 @@ export function useRoom() {
         await new Promise((resolve) => setTimeout(resolve, 200));
 
         let roomId: string | null = null;
+        let normalizedCode: string | null = null;
         if (token) {
             if (!token.startsWith(INVITE_PREFIX)) {
                 setError("Einladungstoken ungültig.");
@@ -95,22 +96,42 @@ export function useRoom() {
                 throw new Error("Invalid token");
             }
             roomId = token.slice(INVITE_PREFIX.length);
+            normalizedCode = generateCode(roomId);
         } else if (code) {
-            if (!ROOM_CODE_PATTERN.test(code)) {
+            const trimmed = code.trim().toUpperCase();
+            const alphanumeric = trimmed.replace(/[^A-Z0-9]/g, "");
+            if (alphanumeric.length !== 6) {
+                setError("Spielcode ungültig.");
+                setState("idle");
+                throw new Error("Invalid code length");
+            }
+            const formatted = `${alphanumeric.slice(0, 3)}-${alphanumeric.slice(3, 6)}`;
+            if (!ROOM_CODE_PATTERN.test(formatted)) {
                 setError("Spielcode ungültig.");
                 setState("idle");
                 throw new Error("Invalid code");
             }
-            roomId = code.replace("-", "");
+            roomId = alphanumeric;
+            normalizedCode = formatted;
         } else {
             setError("Bitte Code oder Einladungstoken angeben.");
             setState("idle");
             throw new Error("Missing join argument");
         }
 
+        if (!roomId) {
+            setError("Raum konnte nicht bestimmt werden.");
+            setState("idle");
+            throw new Error("Missing room id");
+        }
+
+        if (!normalizedCode) {
+            normalizedCode = generateCode(roomId);
+        }
+
         writeLastRoomId(roomId);
         setState("lobby");
-        return { roomId } as const;
+        return { ok: true, roomId, code: normalizedCode } as const;
     }, []);
 
     /**

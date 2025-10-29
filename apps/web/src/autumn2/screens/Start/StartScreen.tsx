@@ -1,3 +1,27 @@
+function getInitialPlayerCount(): number {
+    // 1. Try URL param
+    if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const urlPc = params.get("pc");
+        if (urlPc && !isNaN(Number(urlPc))) {
+            return Math.max(2, Math.min(6, Number(urlPc)));
+        }
+        // 2. Try localStorage
+        const stored = window.localStorage.getItem("yahtzee.playerCount");
+        if (stored && !isNaN(Number(stored))) {
+            return Math.max(2, Math.min(6, Number(stored)));
+        }
+    }
+    // 3. Default
+    return 2;
+}
+
+function addOrUpdateSearch(key: string, value: string | number): string {
+    if (typeof window === "undefined") return "";
+    const params = new URLSearchParams(window.location.search);
+    params.set(key, String(value));
+    return `${window.location.pathname}?${params.toString()}`;
+}
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -33,10 +57,14 @@ export function StartScreen() {
     const location = useLocation();
     const locationState = (location.state as { joined?: boolean; roomId?: string } | null) ?? null;
     const joinedFromState = Boolean(locationState?.joined);
-    const joinedRoomId = locationState?.roomId ?? null;
-    const { resumeRoomId } = useSessionGuard();
+    const joinedRoomIdFromState = locationState?.roomId ?? null;
+    const { resumeRoomId, joinedRoomId, joined } = useSessionGuard();
     const [activeTab, setActiveTab] = useState<TabKey>("host");
-    const [playerCount, setPlayerCount] = useState<number>(4);
+    const [playerCount, setPlayerCount] = useState<number>(() => getInitialPlayerCount());
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        window.localStorage.setItem("yahtzee.playerCount", String(playerCount));
+    }, [playerCount]);
     const [joinCode, setJoinCode] = useState<string>("");
     const [created, setCreated] = useState<
         | null
@@ -48,6 +76,7 @@ export function StartScreen() {
     >(null);
     const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
     const [lastRoomId, setLastRoomId] = useState<string | null>(null);
+    const [joinSucceeded, setJoinSucceeded] = useState(false);
 
     const formattedJoinCode = useMemo(() => formatJoinCode(joinCode), [joinCode]);
     const inviteUrl = useMemo(() => {
@@ -94,34 +123,59 @@ export function StartScreen() {
         if (params.get("new") !== "1") return;
         const room = params.get("room");
         const token = params.get("t");
-        if (!room || !token || !token.startsWith("mock.")) return;
-        setCreated({
+        if (!room || !token) return;
+        const restored = {
             roomId: room,
             inviteToken: token,
             code: deriveJoinCode(room),
-        });
+        } as const;
+        if (typeof window !== "undefined") {
+            window.history.replaceState({ created: restored }, "", `/?new=1&room=${room}&t=${token}`);
+        }
+        setCreated(restored);
         setActiveTab("host");
     }, [created, joinedFromState, location.search]);
 
     useEffect(() => {
-        if (joinedFromState) {
-            setActiveTab("join");
-            setCreated(null);
-            if (joinedRoomId) {
-                const normalized = joinedRoomId.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 6);
-                setJoinCode(normalized);
-            }
+        if (!joinedFromState || created) {
+            return;
         }
-    }, [joinedFromState, joinedRoomId]);
+        setActiveTab("join");
+        setCreated(null);
+        if (joinedRoomIdFromState) {
+            const normalized = joinedRoomIdFromState.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 6);
+            setJoinCode(normalized);
+        }
+        setJoinSucceeded(true);
+    }, [joinedFromState, joinedRoomIdFromState, created]);
+
+    useEffect(() => {
+        if (!joined || !joinedRoomId) {
+            return;
+        }
+        setActiveTab("join");
+        setCreated(null);
+        const normalized = joinedRoomId.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 6);
+        setJoinCode(normalized);
+        setJoinSucceeded(true);
+    }, [joined, joinedRoomId]);
+
+    useEffect(() => {
+        if (activeTab !== "join") {
+            setJoinSucceeded(false);
+        }
+    }, [activeTab]);
 
     async function handleNameSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const name = (displayName ?? "").trim();
         if (!name) return;
         const result = await create({ name, playerCount });
-        const url = `/?new=1&room=${result.roomId}&t=${result.inviteToken}`;
+        // Add pc param to URL
+        const url = addOrUpdateSearch("pc", playerCount);
         if (typeof window !== "undefined") {
-            window.history.replaceState({ created: result }, "", url);
+            window.history.replaceState({ ...window.history.state, created: result, pc: playerCount }, "", url.replace(/([&?])new=1/, "$1new=1"));
+            window.localStorage.setItem("yahtzee.playerCount", String(playerCount));
         }
         setCreated(result);
         setCopyStatus("idle");
@@ -129,28 +183,49 @@ export function StartScreen() {
 
     async function handleJoinSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        const code = formatJoinCode(joinCode).toUpperCase();
-        if (!code) return;
-        const { roomId } = await join({ code });
-        console.log("joined", roomId);
-        const token = `mock.${roomId}`;
-        navigate(`/?new=1&room=${roomId}&t=${token}`, {
-            replace: true,
-            state: { joined: true, roomId },
-        });
+        const raw = joinCode.trim().toUpperCase();
+        const alphanumeric = raw.replace(/[^A-Z0-9]/g, "");
+        if (alphanumeric.length !== 6) {
+            setJoinSucceeded(false);
+            return;
+        }
+        const formatted = `${alphanumeric.slice(0, 3)}-${alphanumeric.slice(3, 6)}`;
+        try {
+            const result = await join({ code: formatted });
+            setJoinSucceeded(true);
+            if (result?.code) {
+                setJoinCode(result.code.replace(/-/g, ""));
+            }
+            const token = `mock.${result.roomId}`;
+            navigate(`/?new=1&room=${result.roomId}&t=${token}`, {
+                replace: true,
+                state: { joined: true, roomId: result.roomId },
+            });
+        } catch (error) {
+            console.debug("join failed", error);
+            setJoinSucceeded(false);
+        }
     }
 
     function handleJoinCodeChange(event: React.ChangeEvent<HTMLInputElement>) {
-        const raw = event.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-        setJoinCode(raw.slice(0, 6));
+        const value = event.target.value.trim().toUpperCase();
+        const cleaned = value.replace(/[^A-Z0-9-]/g, "");
+        const normalized = cleaned.replace(/-/g, "");
+        setJoinCode(normalized.slice(0, 6));
+        setJoinSucceeded(false);
     }
 
     function adjustPlayerCount(delta: number) {
         setPlayerCount((previous) => {
             const next = previous + delta;
-            if (next < 2) return 2;
-            if (next > 6) return 6;
-            return next;
+            const clamped = Math.max(2, Math.min(6, next));
+            if (typeof window !== "undefined") {
+                window.localStorage.setItem("yahtzee.playerCount", String(clamped));
+            }
+            // Update URL param
+            const url = addOrUpdateSearch("pc", clamped);
+            window.history.replaceState(window.history.state, "", url);
+            return clamped;
         });
     }
 
@@ -381,17 +456,22 @@ export function StartScreen() {
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-                                <Button
-                                    type="submit"
-                                    variant="autumn"
-                                    className="w-full py-3 text-base font-semibold text-white shadow-lg sm:w-auto"
-                                    style={{
-                                        backgroundImage: "linear-gradient(90deg, var(--a2-accent), var(--a2-accent-hover-to))",
-                                        boxShadow: "0 16px 40px -20px var(--a2-shadow-warm)",
-                                    }}
-                                >
-                                    {isJoining ? "Beitritt läuft..." : "Beitreten"}
-                                </Button>
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                                    <Button
+                                        type="submit"
+                                        variant="autumn"
+                                        className="w-full py-3 text-base font-semibold text-white shadow-lg sm:w-auto"
+                                        style={{
+                                            backgroundImage: "linear-gradient(90deg, var(--a2-accent), var(--a2-accent-hover-to))",
+                                            boxShadow: "0 16px 40px -20px var(--a2-shadow-warm)",
+                                        }}
+                                    >
+                                        {isJoining ? "Beitritt läuft..." : "Beitreten"}
+                                    </Button>
+                                    {!isJoining && joinSucceeded && (
+                                        <span className="text-sm font-semibold text-emerald-600">Beigetreten</span>
+                                    )}
+                                </div>
                                 <Button
                                     type="button"
                                     variant="ghost"
@@ -458,9 +538,13 @@ export function StartScreen() {
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex flex-1 items-center gap-3 rounded-xl border px-3 py-2" style={{ borderColor: "color-mix(in srgb, var(--a2-accent) 20%, transparent)" }}>
-                                <div className="flex-1 truncate text-sm" title={inviteUrl}>
-                                    {inviteUrl}
-                                </div>
+                                <Input
+                                    aria-label="Einladungslink"
+                                    value={inviteUrl}
+                                    readOnly
+                                    className="flex-1 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
+                                    onFocus={(event) => event.currentTarget.select()}
+                                />
                                 <Button
                                     type="button"
                                     variant="outline"
