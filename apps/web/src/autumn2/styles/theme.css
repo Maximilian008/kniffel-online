@@ -1,5 +1,15 @@
+:root,
+html,
+body,
+#root {
+    height: 100%;
+}
+
 :root {
-    --a2-bg: #f9f4ef;
+    --a2-bg: #f5f0e8;
+    --a2-bg-accent: #f2c093;
+    --a2-bg-accent2: #e37a3c;
+    --a2-bg-accent3: #c24817;
     --a2-panel: rgba(255, 255, 255, 0.8);
     --a2-panel-border: rgba(143, 89, 49, 0.1);
     --a2-text-primary: #2c1408;
@@ -19,6 +29,19 @@
     --a2-radius-control: 0.6rem;
     --a2-radius-chip: 9999px;
     --a2-bottom-breath: clamp(80px, 10vh, 140px);
+}
+
+body[data-a2-page="1"] {
+    background-color: var(--a2-bg);
+    background-image: radial-gradient(
+        120% 80% at 50% 20%,
+        var(--a2-bg-accent) 0%,
+        var(--a2-bg-accent2) 45%,
+        var(--a2-bg-accent3) 100%
+    );
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
 }
 
 /* Hex → Var Zuordnung: siehe tokens.ts */

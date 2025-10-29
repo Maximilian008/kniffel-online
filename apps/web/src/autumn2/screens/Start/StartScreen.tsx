@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import "../../styles/theme.css";
 
@@ -21,10 +21,19 @@ function formatJoinCode(value: string) {
     return `${value.slice(0, 3)}-${value.slice(3, 6)}`;
 }
 
+function deriveJoinCode(roomId: string) {
+    const base = roomId.replace(/[^A-Z0-9]/gi, "").toUpperCase().padEnd(6, "A").slice(0, 6);
+    return `${base.slice(0, 3)}-${base.slice(3, 6)}`;
+}
+
 export function StartScreen() {
     const { displayName, setDisplayName } = useIdentity();
     const { create, join, rejoin, state: roomState } = useRoom();
     const navigate = useNavigate();
+    const location = useLocation();
+    const locationState = (location.state as { joined?: boolean; roomId?: string } | null) ?? null;
+    const joinedFromState = Boolean(locationState?.joined);
+    const joinedRoomId = locationState?.roomId ?? null;
     const { resumeRoomId } = useSessionGuard();
     const [activeTab, setActiveTab] = useState<TabKey>("host");
     const [playerCount, setPlayerCount] = useState<number>(4);
@@ -48,6 +57,18 @@ export function StartScreen() {
     }, [created]);
 
     useEffect(() => {
+        const previous = document.body.getAttribute("data-a2-page");
+        document.body.setAttribute("data-a2-page", "1");
+        return () => {
+            if (previous === null) {
+                document.body.removeAttribute("data-a2-page");
+            } else {
+                document.body.setAttribute("data-a2-page", previous);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
         if (typeof window === "undefined") return;
         try {
             const stored = window.localStorage.getItem("yahtzee.lastRoomId");
@@ -57,15 +78,53 @@ export function StartScreen() {
         }
     }, [created, resumeRoomId]);
 
+    useEffect(() => {
+        if (created) return;
+        if (typeof window === "undefined") return;
+        const historyState = (window.history.state as { created?: typeof created } | null) ?? null;
+        if (historyState?.created) {
+            setCreated(historyState.created);
+            setActiveTab("host");
+        }
+    }, [created]);
+
+    useEffect(() => {
+        if (created || joinedFromState) return;
+        const params = new URLSearchParams(location.search);
+        if (params.get("new") !== "1") return;
+        const room = params.get("room");
+        const token = params.get("t");
+        if (!room || !token || !token.startsWith("mock.")) return;
+        setCreated({
+            roomId: room,
+            inviteToken: token,
+            code: deriveJoinCode(room),
+        });
+        setActiveTab("host");
+    }, [created, joinedFromState, location.search]);
+
+    useEffect(() => {
+        if (joinedFromState) {
+            setActiveTab("join");
+            setCreated(null);
+            if (joinedRoomId) {
+                const normalized = joinedRoomId.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 6);
+                setJoinCode(normalized);
+            }
+        }
+    }, [joinedFromState, joinedRoomId]);
+
     async function handleNameSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const name = (displayName ?? "").trim();
         if (!name) return;
         const result = await create({ name, playerCount });
+        const url = `/?new=1&room=${result.roomId}&t=${result.inviteToken}`;
+        if (typeof window !== "undefined") {
+            window.history.replaceState({ created: result }, "", url);
+        }
         setCreated(result);
         setCopyStatus("idle");
-        const url = `/?new=1&room=${result.roomId}&t=${result.inviteToken}`;
-        navigate(url, { replace: true });
     }
 
     async function handleJoinSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -75,7 +134,10 @@ export function StartScreen() {
         const { roomId } = await join({ code });
         console.log("joined", roomId);
         const token = `mock.${roomId}`;
-        navigate(`/?new=1&room=${roomId}&t=${token}`, { replace: true });
+        navigate(`/?new=1&room=${roomId}&t=${token}`, {
+            replace: true,
+            state: { joined: true, roomId },
+        });
     }
 
     function handleJoinCodeChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -97,7 +159,7 @@ export function StartScreen() {
     const isJoining = roomState === "joining";
 
     async function handleCopy() {
-    if (!inviteUrl || typeof navigator === "undefined" || !navigator.clipboard) return;
+        if (!inviteUrl || typeof navigator === "undefined" || !navigator.clipboard) return;
         try {
             await navigator.clipboard.writeText(inviteUrl);
             setCopyStatus("copied");
@@ -108,11 +170,14 @@ export function StartScreen() {
     }
 
     async function handleResume() {
-    const room = resumeRoomId ?? lastRoomId;
-    if (!room) return;
-    await rejoin({ roomId: room });
-    console.log("rejoined", room);
-    navigate(`/?new=1&room=${room}&t=mock.${room}`, { replace: true });
+        const room = resumeRoomId ?? lastRoomId;
+        if (!room) return;
+        await rejoin({ roomId: room });
+        console.log("rejoined", room);
+        navigate(`/?new=1&room=${room}&t=mock.${room}`, {
+            replace: true,
+            state: { joined: true, roomId: room },
+        });
     }
 
     return (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BrowserRouter } from "react-router-dom";
 import { AnimatedBackground } from "./autumn/components/common/AnimatedBackground";
 import { StatusToast } from "./autumn/components/common/StatusToast";
 import { TopBar } from "./autumn/components/common/TopBar";
@@ -196,12 +197,15 @@ export default function App() {
 
     if (useNewStartFlow) {
         return (
-            <main className="min-h-screen">
-                <Autumn2StartScreen />
-            </main>
+            <BrowserRouter>
+                <main className="min-h-screen flex justify-center">
+                    <Autumn2StartScreen />
+                </main>
+            </BrowserRouter>
         );
     }
 
+    // legacy – not used in new flow
     const socketRef = useRef<AppSocket | null>(null);
     const [socket, setSocket] = useState<AppSocket | null>(null);
     const [connectionPhase, setConnectionPhase] = useState<ConnectionPhase>("connecting");
