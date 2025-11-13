@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   AppSocket,
   RoleConfirmedPayload,
@@ -14,12 +14,14 @@ export type PlayerSession = {
   role: RoomRole;
   name: string;
   sessionId: string;
+  playerId: string;
   timestamp: number;
 };
 
 export type Identity = {
   role: RoomRole;
   name: string;
+  playerId: string;
 };
 
 type SessionState = "loading" | "no_session" | "restoring" | "active" | "conflict";
@@ -50,17 +52,20 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
   const [suggestedName, setSuggestedName] = useState("");
 
   const sessionRef = useRef<PlayerSession | null>(null);
+  const pendingPlayerIdRef = useRef<string | null>(null);
   const restorationAttempted = useRef(false);
 
   // Initialize session on mount
   useEffect(() => {
     const savedSession = readPlayerSession();
-    sessionRef.current = savedSession;
-
     if (savedSession) {
+      sessionRef.current = savedSession;
+      pendingPlayerIdRef.current = savedSession.playerId;
       setSuggestedName(savedSession.name);
       setSessionState("restoring");
     } else {
+      sessionRef.current = null;
+      pendingPlayerIdRef.current = null;
       setSessionState("no_session");
       setModalOpen(true);
     }
@@ -82,9 +87,12 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
     // Check if slot is available or occupied by us
     if (!slot.occupied || (slot.name && equalsIgnoreCase(slot.name, session.name))) {
       setIsClaiming(session.role);
+      const playerId = session.playerId ?? session.sessionId;
+      pendingPlayerIdRef.current = playerId;
       socket.emit("room:claimRole", {
         role: session.role,
         name: session.name,
+        playerId,
       });
     } else {
       // Slot is occupied by someone else, session conflict
@@ -108,7 +116,14 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
     };
 
     const handleRoleConfirmed = (payload: RoleConfirmedPayload) => {
-      const newIdentity: Identity = { role: payload.role, name: payload.name };
+      const playerId =
+        payload.playerId ??
+        pendingPlayerIdRef.current ??
+        sessionRef.current?.playerId ??
+        sessionRef.current?.sessionId ??
+        generateSessionId();
+      pendingPlayerIdRef.current = null;
+      const newIdentity: Identity = { role: payload.role, name: payload.name, playerId };
       setIdentity(newIdentity);
       setIsClaiming(null);
       setError(null);
@@ -120,6 +135,7 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
         role: payload.role,
         name: payload.name,
         sessionId: generateSessionId(),
+        playerId,
         timestamp: Date.now(),
       };
       sessionRef.current = newSession;
@@ -127,6 +143,7 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
     };
 
     const handleRoleDenied = (payload: RoleDeniedPayload) => {
+      pendingPlayerIdRef.current = null;
       setError(payload?.reason ?? "Rolle kann nicht reserviert werden.");
       setIsClaiming(null);
 
@@ -141,6 +158,7 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
     };
 
     const handleRoleRevoked = (_payload: RoleRevokedPayload) => {
+      pendingPlayerIdRef.current = sessionRef.current?.playerId ?? null;
       setIdentity(null);
       setIsClaiming(null);
       setSessionState("conflict");
@@ -181,7 +199,10 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
       setSuggestedName(normalized);
       setIsClaiming(role);
       setError(null);
-      socket.emit("room:claimRole", { role, name: normalized });
+      const session = sessionRef.current;
+      const playerId = session?.playerId ?? pendingPlayerIdRef.current ?? session?.sessionId ?? generateSessionId();
+      pendingPlayerIdRef.current = playerId;
+      socket.emit("room:claimRole", { role, name: normalized, playerId });
     },
     [socket]
   );
@@ -194,6 +215,7 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
     setSessionState("no_session");
     setModalOpen(true);
     sessionRef.current = null;
+    pendingPlayerIdRef.current = null;
     clearPlayerSession();
     setSuggestedName("");
   }, [socket, identity]);
@@ -207,6 +229,7 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
     setSessionState("no_session");
     setModalOpen(true);
     sessionRef.current = null;
+    pendingPlayerIdRef.current = null;
     clearPlayerSession();
     setSuggestedName("");
     setError(null);

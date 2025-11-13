@@ -1,13 +1,14 @@
 function getInitialPlayerCount(): number {
     // 1. Try URL param
     if (typeof window !== "undefined") {
+        ensureStorageMigration();
         const params = new URLSearchParams(window.location.search);
         const urlPc = params.get("pc");
         if (urlPc && !isNaN(Number(urlPc))) {
             return Math.max(2, Math.min(6, Number(urlPc)));
         }
         // 2. Try localStorage
-        const stored = window.localStorage.getItem("yahtzee.playerCount");
+        const stored = window.localStorage.getItem(a2Key("playerCount"));
         if (stored && !isNaN(Number(stored))) {
             return Math.max(2, Math.min(6, Number(stored)));
         }
@@ -16,11 +17,35 @@ function getInitialPlayerCount(): number {
     return 2;
 }
 
-function addOrUpdateSearch(key: string, value: string | number): string {
-    if (typeof window === "undefined") return "";
-    const params = new URLSearchParams(window.location.search);
-    params.set(key, String(value));
-    return `${window.location.pathname}?${params.toString()}`;
+export function updateSearchParam(
+    key: string,
+    value: string | null,
+    updateState?: (previousState: unknown) => unknown,
+) {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const previousValue = url.searchParams.get(key);
+    let mutated = false;
+
+    if (value === null || value === "") {
+        if (previousValue !== null) {
+            url.searchParams.delete(key);
+            mutated = true;
+        }
+    } else if (previousValue !== value) {
+        url.searchParams.set(key, value);
+        mutated = true;
+    }
+
+    const nextState = updateState ? updateState(window.history.state) : window.history.state;
+    if (!mutated) {
+        if (nextState !== window.history.state) {
+            window.history.replaceState(nextState, "", window.location.href);
+        }
+        return;
+    }
+
+    window.history.replaceState(nextState, "", url.toString());
 }
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -30,8 +55,9 @@ import "../../styles/theme.css";
 import { Button } from "../../../autumn/ui/button";
 import { Input } from "../../../autumn/ui/input";
 import { useIdentity } from "../../hooks/useIdentity";
-import { useRoom } from "../../hooks/useRoom";
+import { adapterName, useRoom } from "../../hooks/useRoom";
 import { useSessionGuard } from "../../hooks/useSessionGuard";
+import { a2Key, ensureStorageMigration } from "../../storage";
 
 type TabKey = "host" | "join";
 
@@ -50,33 +76,68 @@ function deriveJoinCode(roomId: string) {
     return `${base.slice(0, 3)}-${base.slice(3, 6)}`;
 }
 
+function formatInviteCountdown(ms: number): string {
+    if (ms <= 0) return "abgelaufen";
+    const totalSeconds = Math.ceil(ms / 1000);
+    if (totalSeconds >= 3600) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        return `${hours}h ${minutes}m`;
+    }
+    if (totalSeconds >= 60) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds.toString().padStart(2, "0")} min`;
+    }
+    return `${totalSeconds}s`;
+}
 export function StartScreen() {
     const { displayName, setDisplayName } = useIdentity();
-    const { create, join, rejoin, state: roomState } = useRoom();
+    const { create, join, rejoin, refreshInvite, state: roomState, error: roomError } = useRoom();
     const navigate = useNavigate();
     const location = useLocation();
+    const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+    const queryRoomId = searchParams.get("room") ?? undefined;
+    const queryToken = searchParams.get("t") ?? undefined;
+    const queryCode = searchParams.get("code") ?? undefined;
     const locationState = (location.state as { joined?: boolean; roomId?: string } | null) ?? null;
     const joinedFromState = Boolean(locationState?.joined);
     const joinedRoomIdFromState = locationState?.roomId ?? null;
-    const { resumeRoomId, joinedRoomId, joined } = useSessionGuard();
+    const { joined, joinedRoomId, error: guardError } = useSessionGuard({
+        roomId: queryRoomId,
+        token: queryToken,
+        code: queryCode,
+    });
     const [activeTab, setActiveTab] = useState<TabKey>("host");
     const [playerCount, setPlayerCount] = useState<number>(() => getInitialPlayerCount());
     useEffect(() => {
         if (typeof window === "undefined") return;
-        window.localStorage.setItem("yahtzee.playerCount", String(playerCount));
+        ensureStorageMigration();
+        window.localStorage.setItem(a2Key("playerCount"), String(playerCount));
     }, [playerCount]);
     const [joinCode, setJoinCode] = useState<string>("");
     const [created, setCreated] = useState<
         | null
         | {
-              roomId: string;
-              code: string;
-              inviteToken: string;
-          }
+            roomId: string;
+            code: string;
+            inviteToken: string;
+            hostId: string | null;
+            inviteExpiresAt: number | null;
+        }
     >(null);
     const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+    const [refreshingInvite, setRefreshingInvite] = useState(false);
+    const [now, setNow] = useState(() => Date.now());
     const [lastRoomId, setLastRoomId] = useState<string | null>(null);
     const [joinSucceeded, setJoinSucceeded] = useState(false);
+    const resumeRoomId = joinedRoomId ?? lastRoomId;
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            ensureStorageMigration();
+        }
+    }, []);
 
     const formattedJoinCode = useMemo(() => formatJoinCode(joinCode), [joinCode]);
     const inviteUrl = useMemo(() => {
@@ -84,6 +145,31 @@ export function StartScreen() {
         const params = new URLSearchParams({ room: created.roomId, t: created.inviteToken });
         return `${window.location.origin}/?${params.toString()}`;
     }, [created]);
+
+    useEffect(() => {
+        if (!created?.inviteExpiresAt) return;
+        setNow(Date.now());
+        const timer = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => {
+            window.clearInterval(timer);
+        };
+    }, [created?.inviteExpiresAt]);
+
+    const inviteExpiresAt = created?.inviteExpiresAt ?? null;
+    const inviteRemainingMs = inviteExpiresAt !== null ? inviteExpiresAt - now : null;
+    const inviteExpired = inviteRemainingMs !== null && inviteRemainingMs <= 0;
+    const inviteCountdownLabel = useMemo(() => {
+        if (inviteRemainingMs === null) return null;
+        return formatInviteCountdown(inviteRemainingMs);
+    }, [inviteRemainingMs]);
+
+    const activeError = roomError ?? guardError ?? null;
+
+    useEffect(() => {
+        if (activeError) {
+            setJoinSucceeded(false);
+        }
+    }, [activeError]);
 
     useEffect(() => {
         const previous = document.body.getAttribute("data-a2-page");
@@ -99,22 +185,55 @@ export function StartScreen() {
 
     useEffect(() => {
         if (typeof window === "undefined") return;
+        ensureStorageMigration();
         try {
-            const stored = window.localStorage.getItem("yahtzee.lastRoomId");
+            const stored = window.localStorage.getItem(a2Key("lastRoomId"));
             setLastRoomId(stored && stored.length > 0 ? stored : null);
         } catch {
             setLastRoomId(null);
         }
-    }, [created, resumeRoomId]);
+    }, [created, joinedRoomId]);
+
+    useEffect(() => {
+        if (!joinedRoomId) return;
+        if (typeof window !== "undefined") {
+            try {
+                ensureStorageMigration();
+                window.localStorage.setItem(a2Key("lastRoomId"), joinedRoomId);
+            } catch {
+                // ignore storage failures
+            }
+        }
+        setLastRoomId((previous) => (previous === joinedRoomId ? previous : joinedRoomId));
+    }, [joinedRoomId]);
 
     useEffect(() => {
         if (created) return;
         if (typeof window === "undefined") return;
-        const historyState = (window.history.state as { created?: typeof created } | null) ?? null;
-        if (historyState?.created) {
-            setCreated(historyState.created);
-            setActiveTab("host");
-        }
+        const historyState = (window.history.state as { created?: unknown } | null) ?? null;
+        const candidate = historyState?.created as
+            | {
+                  roomId?: unknown;
+                  code?: unknown;
+                  inviteToken?: unknown;
+                  hostId?: unknown;
+                  inviteExpiresAt?: unknown;
+              }
+            | undefined;
+        if (!candidate) return;
+        if (typeof candidate.roomId !== "string") return;
+        if (typeof candidate.code !== "string") return;
+        if (typeof candidate.inviteToken !== "string") return;
+        const restored = {
+            roomId: candidate.roomId,
+            code: candidate.code,
+            inviteToken: candidate.inviteToken,
+            hostId: typeof candidate.hostId === "string" ? candidate.hostId : null,
+            inviteExpiresAt:
+                typeof candidate.inviteExpiresAt === "number" ? candidate.inviteExpiresAt : null,
+        } as const;
+        setCreated(restored);
+        setActiveTab("host");
     }, [created]);
 
     useEffect(() => {
@@ -128,6 +247,8 @@ export function StartScreen() {
             roomId: room,
             inviteToken: token,
             code: deriveJoinCode(room),
+            hostId: null,
+            inviteExpiresAt: null,
         } as const;
         if (typeof window !== "undefined") {
             window.history.replaceState({ created: restored }, "", `/?new=1&room=${room}&t=${token}`);
@@ -158,6 +279,7 @@ export function StartScreen() {
         const normalized = joinedRoomId.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 6);
         setJoinCode(normalized);
         setJoinSucceeded(true);
+        updateSearchParam("t", null);
     }, [joined, joinedRoomId]);
 
     useEffect(() => {
@@ -171,13 +293,22 @@ export function StartScreen() {
         const name = (displayName ?? "").trim();
         if (!name) return;
         const result = await create({ name, playerCount });
-        // Add pc param to URL
-        const url = addOrUpdateSearch("pc", playerCount);
+        const payload = {
+            roomId: result.roomId,
+            code: result.code,
+            inviteToken: result.inviteToken,
+            hostId: result.hostId ?? null,
+            inviteExpiresAt: result.inviteExpiresAt ?? null,
+        } as const;
         if (typeof window !== "undefined") {
-            window.history.replaceState({ ...window.history.state, created: result, pc: playerCount }, "", url.replace(/([&?])new=1/, "$1new=1"));
-            window.localStorage.setItem("yahtzee.playerCount", String(playerCount));
+            updateSearchParam("pc", String(playerCount), (previous) => {
+                const baseState = (previous && typeof previous === "object") ? previous : {};
+                return { ...baseState, created: payload, pc: playerCount };
+            });
+            ensureStorageMigration();
+            window.localStorage.setItem(a2Key("playerCount"), String(playerCount));
         }
-        setCreated(result);
+        setCreated(payload);
         setCopyStatus("idle");
     }
 
@@ -185,10 +316,6 @@ export function StartScreen() {
         event.preventDefault();
         const raw = joinCode.trim().toUpperCase();
         const alphanumeric = raw.replace(/[^A-Z0-9]/g, "");
-        if (alphanumeric.length !== 6) {
-            setJoinSucceeded(false);
-            return;
-        }
         const formatted = `${alphanumeric.slice(0, 3)}-${alphanumeric.slice(3, 6)}`;
         try {
             const result = await join({ code: formatted });
@@ -196,14 +323,53 @@ export function StartScreen() {
             if (result?.code) {
                 setJoinCode(result.code.replace(/-/g, ""));
             }
-            const token = `mock.${result.roomId}`;
-            navigate(`/?new=1&room=${result.roomId}&t=${token}`, {
+            const inviteToken = result.inviteToken ?? `mock.${result.roomId}`;
+            navigate(`/?new=1&room=${result.roomId}&t=${inviteToken}`, {
                 replace: true,
                 state: { joined: true, roomId: result.roomId },
             });
+            updateSearchParam("t", null);
         } catch (error) {
-            console.debug("join failed", error);
+            if (import.meta.env.DEV) {
+                console.debug("[autumn2] join failed", error);
+            }
             setJoinSucceeded(false);
+        }
+    }
+
+    async function handleRefreshInvite() {
+        if (!created?.roomId) return;
+        try {
+            setRefreshingInvite(true);
+            const result = await refreshInvite(created.roomId, created.inviteToken);
+            if (!result.ok) {
+                return;
+            }
+            setCreated((previous) => {
+                const nextHost = result.hostId ?? previous?.hostId ?? null;
+                const payload = {
+                    roomId: result.roomId,
+                    code: result.code,
+                    inviteToken: result.token,
+                    hostId: nextHost,
+                    inviteExpiresAt: result.inviteExpiresAt ?? null,
+                } as const;
+                if (typeof window !== "undefined") {
+                    window.history.replaceState(
+                        { created: payload },
+                        "",
+                        `/?new=1&room=${payload.roomId}&t=${payload.inviteToken}`,
+                    );
+                }
+                return payload;
+            });
+            setCopyStatus("idle");
+        } catch (error) {
+            if (import.meta.env.DEV) {
+                console.debug("[autumn2] refresh invite failed", error);
+            }
+        } finally {
+            setRefreshingInvite(false);
         }
     }
 
@@ -220,11 +386,10 @@ export function StartScreen() {
             const next = previous + delta;
             const clamped = Math.max(2, Math.min(6, next));
             if (typeof window !== "undefined") {
-                window.localStorage.setItem("yahtzee.playerCount", String(clamped));
+                ensureStorageMigration();
+                window.localStorage.setItem(a2Key("playerCount"), String(clamped));
+                updateSearchParam("pc", String(clamped));
             }
-            // Update URL param
-            const url = addOrUpdateSearch("pc", clamped);
-            window.history.replaceState(window.history.state, "", url);
             return clamped;
         });
     }
@@ -245,15 +410,20 @@ export function StartScreen() {
     }
 
     async function handleResume() {
-        const room = resumeRoomId ?? lastRoomId;
+        const room = resumeRoomId;
         if (!room) return;
         await rejoin({ roomId: room });
-        console.log("rejoined", room);
+        if (import.meta.env.DEV) {
+            console.log("[autumn2] rejoined", room);
+        }
         navigate(`/?new=1&room=${room}&t=mock.${room}`, {
             replace: true,
             state: { joined: true, roomId: room },
         });
+        updateSearchParam("t", null);
     }
+
+    const isDev = import.meta.env.DEV;
 
     return (
         <div className="flex w-full flex-1 justify-center px-4 py-10" style={{ backgroundColor: "var(--a2-bg)" }}>
@@ -288,15 +458,15 @@ export function StartScreen() {
                                 style={
                                     isActive
                                         ? {
-                                              backgroundImage:
-                                                  "linear-gradient(90deg, var(--a2-accent), var(--a2-accent-hover-to))",
-                                              color: "white",
-                                              boxShadow: "0 18px 40px -24px var(--a2-shadow-warm)",
-                                          }
+                                            backgroundImage:
+                                                "linear-gradient(90deg, var(--a2-accent), var(--a2-accent-hover-to))",
+                                            color: "white",
+                                            boxShadow: "0 18px 40px -24px var(--a2-shadow-warm)",
+                                        }
                                         : {
-                                              borderColor: "color-mix(in srgb, var(--a2-accent) 35%, transparent)",
-                                              color: "var(--a2-text-primary)",
-                                          }
+                                            borderColor: "color-mix(in srgb, var(--a2-accent) 35%, transparent)",
+                                            color: "var(--a2-text-primary)",
+                                        }
                                 }
                                 onClick={() => setActiveTab(tab.key)}
                                 aria-pressed={isActive}
@@ -306,6 +476,20 @@ export function StartScreen() {
                         );
                     })}
                 </nav>
+
+                {activeError ? (
+                    <div
+                        role="alert"
+                        className="rounded-2xl border px-4 py-3 text-sm font-medium"
+                        style={{
+                            borderColor: "color-mix(in srgb, crimson 35%, transparent)",
+                            background: "color-mix(in srgb, white 78%, crimson 12%)",
+                            color: "color-mix(in srgb, crimson 80%, var(--a2-text-primary))",
+                        }}
+                    >
+                        {activeError}
+                    </div>
+                ) : null}
 
                 {activeTab === "host" ? (
                     <form
@@ -481,7 +665,11 @@ export function StartScreen() {
                                         color: "var(--a2-accent)",
                                         backgroundColor: "transparent",
                                     }}
-                                    onClick={() => console.log("scan")}
+                                    onClick={() => {
+                                        if (import.meta.env.DEV) {
+                                            console.log("[autumn2] scan QR");
+                                        }
+                                    }}
                                 >
                                     QR scannen
                                 </Button>
@@ -502,7 +690,7 @@ export function StartScreen() {
                         color: "var(--a2-text-muted)",
                     }}
                 >
-                    {resumeRoomId || lastRoomId ? (
+                    {resumeRoomId ? (
                         <Button
                             type="button"
                             variant="autumn"
@@ -564,6 +752,11 @@ export function StartScreen() {
                                 className="flex h-32 w-32 items-center justify-center rounded-xl border"
                                 style={{ borderColor: "color-mix(in srgb, var(--a2-accent) 18%, transparent)" }}
                                 aria-hidden="true"
+                                onClick={() => {
+                                    if (import.meta.env.DEV) {
+                                        console.log("[autumn2] QR placeholder clicked");
+                                    }
+                                }}
                             >
                                 {/* TODO: QR-Code Integration */}
                                 <span className="text-xs" style={{ color: "var(--a2-text-muted)" }}>
@@ -571,9 +764,44 @@ export function StartScreen() {
                                 </span>
                             </div>
                         </div>
+
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <span
+                                className="text-sm"
+                                style={{
+                                    color: inviteExpired ? "color-mix(in srgb, crimson 60%, var(--a2-text-primary))" : "var(--a2-text-muted)",
+                                }}
+                            >
+                                {inviteCountdownLabel
+                                    ? inviteExpired
+                                        ? "Der Link ist abgelaufen. Bitte erneuere die Einladung."
+                                        : `Link laeuft ab in ${inviteCountdownLabel}.`
+                                    : "Link besitzt keine Ablaufzeit."}
+                            </span>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleRefreshInvite}
+                                disabled={refreshingInvite}
+                                className="text-sm sm:w-auto"
+                            >
+                                {refreshingInvite ? "Aktualisiere..." : "Link erneuern"}
+                            </Button>
+                        </div>
                     </section>
                 )}
             </div>
+            {isDev && adapterName === "mock" ? (
+                <button
+                    aria-label="Open legacy (DEV)"
+                    className="fixed bottom-3 right-3 rounded-lg px-3 py-2 text-xs opacity-70 shadow transition hover:opacity-100"
+                    onClick={() => {
+                        window.location.href = "/";
+                    }}
+                >
+                    Legacy oeffnen (DEV)
+                </button>
+            ) : null}
         </div>
     );
 }
@@ -589,3 +817,4 @@ export function StartScreen() {
 // rgba(120,60,15,0.6) → var(--a2-shadow-warm)
 // #9f6644 → var(--a2-placeholder)
 // SharePanel zeigt Link (Invite-URL), großen Code und QR-Stub.
+

@@ -1,62 +1,74 @@
 import { useEffect, useRef, useState } from "react";
 
-import { useRoom } from "./useRoom";
+import { joinRoom, formatJoinError } from "./useRoom";
 
-export function useSessionGuard() {
-    const { join } = useRoom();
-    const [resumeRoomId, setResumeRoomId] = useState<string | null>(null);
-    const [joinedRoomId, setJoinedRoomId] = useState<string | null>(null);
-    const hasCheckedRef = useRef(false);
+export type GuardParams = {
+    roomId?: string;
+    token?: string;
+    code?: string;
+};
+
+export function useSessionGuard(params?: GuardParams) {
+    const { roomId, token, code } = params ?? {};
+    const [joined, setJoined] = useState(false);
+    const [joinedRoomId, setJoinedRoomId] = useState<string | undefined>(undefined);
+    const [error, setError] = useState<string | undefined>(undefined);
+    const latchRef = useRef(false);
+    const abortRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
-        if (hasCheckedRef.current) {
-            return;
-        }
-        hasCheckedRef.current = true;
-
-        if (typeof window === "undefined") {
-            return;
-        }
-
-        const params = new URLSearchParams(window.location.search);
-        const room = params.get("room");
-        const token = params.get("t");
-
-        const restoreLastRoom = () => {
-            try {
-                const last = window.localStorage.getItem("yahtzee.lastRoomId");
-                setResumeRoomId(last && last.length > 0 ? last : null);
-            } catch {
-                setResumeRoomId(null);
-            }
+        return () => {
+            abortRef.current?.abort();
+            abortRef.current = null;
         };
+    }, []);
 
-        if (room && token) {
-            (async () => {
-                try {
-                    const { roomId } = await join({ token });
-                    console.info("[guard] joined by token", roomId);
-                    setJoinedRoomId(roomId);
-                    setResumeRoomId(roomId);
-                    try {
-                        window.localStorage.setItem("yahtzee.lastRoomId", roomId);
-                    } catch {
-                        // ignore storage failures
-                    }
-                } catch (error) {
-                    console.debug("silent join failed", error);
-                    restoreLastRoom();
-                }
-            })();
+    useEffect(() => {
+        const canTry = Boolean(token) || Boolean(code);
+        if (!canTry) {
+            latchRef.current = false;
             return;
         }
+        if (latchRef.current) return;
 
-        restoreLastRoom();
-    }, [join]);
+        const controller = new AbortController();
+        abortRef.current = controller;
+        latchRef.current = true;
+        setError(undefined);
+
+        (async () => {
+            try {
+                const payload = token ? { token } : { code };
+
+                if (controller.signal.aborted) return;
+                const result = await joinRoom(payload as { token: string } | { code: string });
+                if (controller.signal.aborted) return;
+
+                if (result.ok) {
+                    setJoined(true);
+                    setJoinedRoomId(result.roomId);
+                } else {
+                    setError(formatJoinError(result.error));
+                }
+            } catch (joinError) {
+                if (!controller.signal.aborted) {
+                    const message =
+                        joinError instanceof Error ? joinError.message : (joinError as { message?: string })?.message;
+                    setError(formatJoinError(message ?? "unknown error"));
+                }
+            }
+        })();
+
+        return () => {
+            controller.abort();
+            abortRef.current = null;
+            latchRef.current = false;
+        };
+    }, [token, code, roomId]);
 
     return {
-        resumeRoomId,
+        joined,
         joinedRoomId,
-        joined: joinedRoomId !== null,
+        error,
     } as const;
 }

@@ -16,7 +16,13 @@
     "dev": "tsx src/dev.ts"
   },
   "dependencies": {
-    "@shared/lib": "workspace:*"
+    "@eslint/js": "^9.38.0",
+    "@shared/lib": "workspace:*",
+    "eslint": "^9.38.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.4.0",
+    "typescript-eslint": "^8.46.2"
   },
   "devDependencies": {
     "tsx": "^4.16.0",

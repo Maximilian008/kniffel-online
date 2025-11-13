@@ -8,6 +8,7 @@ type Props = {
   opponentReady?: boolean;
   opponentConnected: boolean;
   startDisabled: boolean;
+  isHost?: boolean;
   playerCount?: number;
   onPlayerCountChange?: (count: number) => void;
   onNameChange: (value: string) => void;
@@ -28,6 +29,7 @@ export default function SetupScreen({
   opponentReady = false,
   opponentConnected,
   startDisabled,
+  isHost = true,
   onNameChange,
   onNameFocus,
   onNameBlur,
@@ -41,6 +43,7 @@ export default function SetupScreen({
   const isConnecting = connectionPhase === "connecting";
   const isWaiting = connectionPhase === "waiting";
   const isMatched = connectionPhase === "matched";
+  const canAdjustPlayerCount = Boolean(isHost);
 
   function initials(name: string): string {
     const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -66,14 +69,20 @@ export default function SetupScreen({
                 key={n}
                 type="button"
                 className={`btn ${playerCount === n ? "btn-primary" : "btn-outline"}`}
-                onClick={() => onPlayerCountChange?.(n)}
+                onClick={() => {
+                  if (!canAdjustPlayerCount) return;
+                  onPlayerCountChange?.(n);
+                }}
+                disabled={!canAdjustPlayerCount}
                 title={`${n} Spieler`}
               >
                 {n}
               </button>
             ))}
           </div>
-          <p className="hint">Wähle die Anzahl der Spieler (2–6).</p>
+          <p className="hint">
+            Wähle die Anzahl der Spieler (2–6).{!canAdjustPlayerCount ? " Nur der Host kann diese Einstellung ändern." : ""}
+          </p>
         </div>
 
         <div className={`name-card ${isConnecting ? 'loading' : ''}`}>

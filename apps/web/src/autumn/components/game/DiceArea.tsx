@@ -37,7 +37,7 @@ export function DiceArea({
     soundEnabled,
     onToggleSound,
 }: DiceAreaProps) {
-    const disableHold = rollsLeft === 3 || !isCurrentPlayer;
+    const disableHold = rollsLeft === 3 || !isCurrentPlayer || isRolling;
     const rollDisabled = !isCurrentPlayer || isRolling || !canRoll || rollsLeft === 0;
 
     return (
@@ -51,6 +51,7 @@ export function DiceArea({
                             held={Boolean(heldDice[index])}
                             onToggle={() => onToggleHeld(index)}
                             disabled={disableHold}
+                            isRolling={isRolling}
                         />
                     ))}
                 </div>
@@ -62,6 +63,7 @@ export function DiceArea({
                             held={Boolean(heldDice[index + 2])}
                             onToggle={() => onToggleHeld(index + 2)}
                             disabled={disableHold}
+                            isRolling={isRolling}
                         />
                     ))}
                 </div>

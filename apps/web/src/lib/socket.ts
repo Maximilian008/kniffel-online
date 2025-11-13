@@ -7,12 +7,15 @@ export type RoleStatus = {
   name: string | null;
   occupied: boolean;
   connected: boolean;
+  playerId: string | null;
+  isHost: boolean;
   releaseDeadline: number | null;
 };
 
 export type RoomStatusPayload = {
   roomId: string;
   capacity: number; // 2..6
+  hostId: string | null;
   roles: Partial<Record<RoomRole, RoleStatus>>;
 };
 
@@ -21,6 +24,7 @@ export type RoleConfirmedPayload = {
   role: RoomRole;
   name: string;
   playerIndex: number; // 0..N-1
+  playerId: string | null;
 };
 
 export type RoleDeniedPayload = {
@@ -52,7 +56,7 @@ const RECONNECTION_DELAY_MAX_MS = 5_000;
 const CONNECTION_TIMEOUT_MS = 20_000;
 
 const SOCKET_DISABLED =
-    import.meta.env.VITE_NEW_START_FLOW === "1" || import.meta.env.VITE_DISABLE_SOCKETS === "1";
+  import.meta.env.VITE_NEW_START_FLOW === "1" || import.meta.env.VITE_DISABLE_SOCKETS === "1";
 
 export function createSocket(url?: string): AppSocket | null {
   if (SOCKET_DISABLED) {

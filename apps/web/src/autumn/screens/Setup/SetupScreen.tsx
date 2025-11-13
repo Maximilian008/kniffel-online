@@ -16,6 +16,7 @@ export type SetupPlayer = {
     connected: boolean;
     ready: boolean;
     isSelf?: boolean;
+    isHost?: boolean;
 };
 
 type SetupScreenProps = {
@@ -33,6 +34,7 @@ type SetupScreenProps = {
     localReady: boolean;
     statusMessage: string;
     players?: SetupPlayer[];
+    isHost?: boolean;
 };
 
 const setupVars = autumnCssVars.setup;
@@ -131,8 +133,10 @@ export function SetupScreen({
     localReady,
     statusMessage,
     players,
+    isHost = true,
 }: SetupScreenProps) {
     const roster = players ?? [];
+    const canManageLobby = Boolean(isHost);
     const editableSeatIndex = roster.findIndex((player) => player?.isSelf);
 
     const seats = Array.from({ length: playerCount }, (_, index) => {
@@ -177,8 +181,11 @@ export function SetupScreen({
                                 type="button"
                                 size="icon"
                                 variant="autumn"
-                                onClick={() => onPlayerCountChange(Math.max(2, playerCount - 1))}
-                                disabled={playerCount <= 2}
+                                onClick={() => {
+                                    if (!canManageLobby) return;
+                                    onPlayerCountChange(Math.max(2, playerCount - 1));
+                                }}
+                                disabled={playerCount <= 2 || !canManageLobby}
                                 className="rounded-full"
                                 style={{ width: "44px", height: "44px", color: "#ffffff" }}
                             >
@@ -191,14 +198,22 @@ export function SetupScreen({
                                 type="button"
                                 size="icon"
                                 variant="autumn"
-                                onClick={() => onPlayerCountChange(Math.min(6, playerCount + 1))}
-                                disabled={playerCount >= 6}
+                                onClick={() => {
+                                    if (!canManageLobby) return;
+                                    onPlayerCountChange(Math.min(6, playerCount + 1));
+                                }}
+                                disabled={playerCount >= 6 || !canManageLobby}
                                 className="rounded-full"
                                 style={{ width: "44px", height: "44px", color: "#ffffff" }}
                             >
                                 <Plus className="h-4 w-4" />
                             </Button>
                         </div>
+                        <span style={helperTextStyle}>
+                            {canManageLobby
+                                ? "Nur der Host kann die Spieleranzahl anpassen."
+                                : "Nur der Host kann die Spieleranzahl anpassen."}
+                        </span>
                     </section>
 
                     <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
@@ -256,6 +271,7 @@ export function SetupScreen({
                                         const ready = Boolean(player.ready);
                                         const connected = Boolean(player.connected);
                                         const badgeStyles = lobbyBadgeStyle({ ready, connected });
+                                        const isHostPlayer = Boolean(player.isHost);
                                         const resolvedName = player.name?.trim() || `Spieler ${index + 1}`;
 
                                         return (
@@ -276,6 +292,7 @@ export function SetupScreen({
                                                 <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                                                     <span style={{ fontWeight: 600 }}>
                                                         {player.isSelf ? `${resolvedName} (Du)` : resolvedName}
+                                                        {isHostPlayer ? " · Host" : ""}
                                                     </span>
                                                     <span style={{ fontSize: "0.75rem", color: cssVar(setupVars.helperText, setupFallbacks.helperText) }}>
                                                         {connected ? "Verbunden" : "Nicht verbunden"}

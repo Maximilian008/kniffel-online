@@ -26,6 +26,18 @@ export type PersistedGame = {
   scores: number[] | null;
   winner: string | null;
   capacity?: number;
+  meta?: {
+    hostId: string | null;
+  };
+};
+
+export type DirectoryEntryRecord = {
+  roomId: string;
+  code: string;
+  normalizedCode: string;
+  inviteToken: string;
+  createdAt: number;
+  updatedAt: number;
 };
 
 function clone<T>(value: T): T {
@@ -35,6 +47,7 @@ function clone<T>(value: T): T {
 type StoredGame = PersistedGame;
 
 let games = new Map<string, StoredGame>();
+let directoryEntries = new Map<string, DirectoryEntryRecord>();
 let loaded = false;
 
 
@@ -45,13 +58,24 @@ function ensureLoaded() {
     try {
       const raw = fs.readFileSync(DB_PATH, "utf8");
       if (raw.trim().length > 0) {
-        const payload = JSON.parse(raw) as { version?: number; games?: StoredGame[] } | StoredGame[];
+        const payload = JSON.parse(raw) as
+          | { version?: number; games?: StoredGame[]; directory?: DirectoryEntryRecord[] }
+          | StoredGame[];
         const entries = Array.isArray(payload) ? payload : payload.games ?? [];
-        games = new Map(entries.map((game) => [game.roomId, game]));
+        const normalizedGames = entries.map((game) => ({
+          ...game,
+          meta: {
+            hostId: (game as PersistedGame).meta?.hostId ?? null,
+          },
+        }));
+        games = new Map(normalizedGames.map((game) => [game.roomId, game]));
+        const directory = Array.isArray(payload) ? [] : payload.directory ?? [];
+        directoryEntries = new Map(directory.map((entry) => [entry.roomId, entry]));
       }
     } catch (error) {
       console.warn("Failed to load persisted games. Starting with empty store.", error);
       games = new Map();
+      directoryEntries = new Map();
     }
   }
   loaded = true;
@@ -59,7 +83,11 @@ function ensureLoaded() {
 
 function persist() {
   if (!loaded) return;
-  const payload = { version: 1, games: Array.from(games.values()) };
+  const payload = {
+    version: 2,
+    games: Array.from(games.values()),
+    directory: Array.from(directoryEntries.values()),
+  };
   const data = JSON.stringify(payload, null, 2);
   fs.writeFileSync(TEMP_PATH, data);
   fs.renameSync(TEMP_PATH, DB_PATH);
@@ -86,6 +114,24 @@ export function deleteGame(roomId: string) {
   if (games.delete(roomId)) {
     persist();
   }
+}
+
+export function upsertDirectoryEntry(record: DirectoryEntryRecord) {
+  ensureLoaded();
+  directoryEntries.set(record.roomId, clone(record));
+  persist();
+}
+
+export function removeDirectoryEntry(roomId: string) {
+  ensureLoaded();
+  if (directoryEntries.delete(roomId)) {
+    persist();
+  }
+}
+
+export function listDirectoryEntries(): DirectoryEntryRecord[] {
+  ensureLoaded();
+  return Array.from(directoryEntries.values()).map((entry) => clone(entry));
 }
 
 export function listHistory(limit = 50): HistoryEntry[] {
@@ -236,6 +282,9 @@ export function toPersistedGame(
     scores?: number[] | null;
     winner?: string | null;
     capacity?: number;
+    meta?: {
+      hostId?: string | null;
+    };
   }
 ): PersistedGame {
   const createdAt = params.createdAt ?? Date.now();
@@ -263,5 +312,8 @@ export function toPersistedGame(
     scores,
     winner,
     capacity: params.capacity,
+    meta: {
+      hostId: params.meta?.hostId ?? null,
+    },
   };
 }

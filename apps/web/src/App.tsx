@@ -165,13 +165,13 @@ function getSetupStatusMessage(args: {
         return "Warten auf weitere Spieler...";
     }
     if (!args.opponentConnected) {
-        return "Teile den Link, damit Mitspieler beitreten können.";
+        return "Teile den Link, damit Mitspieler beitreten koennen.";
     }
     if (!args.opponentReady) {
         return "Mitspieler sind verbunden. Warten auf Start.";
     }
     if (!args.localReady) {
-        return "Drücke \"Spiel starten\", wenn du bereit bist.";
+        return "Druecke \"Spiel starten\", wenn du bereit bist.";
     }
     return "Alle Spieler sind bereit!";
 }
@@ -183,9 +183,9 @@ function getTopBarHint(
 ) {
     if (connectionPhase === "connecting") return "Verbindung wird hergestellt...";
     if (connectionPhase === "waiting") return "Warte auf Mitspieler";
-    if (!phase) return opponentConnected ? "Lobby geöffnet" : "Bereit zum Start";
+    if (!phase) return opponentConnected ? "Lobby geoeffnet" : "Bereit zum Start";
     if (phase === "setup") return opponentConnected ? "Mitspieler verbunden" : "Lobby offen";
-    if (phase === "playing") return "Spiel läuft";
+    if (phase === "playing") return "Spiel laeuft";
     if (phase === "finished") return "Spiel beendet";
     return undefined;
 }
@@ -205,7 +205,7 @@ export default function App() {
         );
     }
 
-    // legacy – not used in new flow
+    // legacy - not used in new flow
     const socketRef = useRef<AppSocket | null>(null);
     const [socket, setSocket] = useState<AppSocket | null>(null);
     const [connectionPhase, setConnectionPhase] = useState<ConnectionPhase>("connecting");
@@ -336,6 +336,8 @@ export default function App() {
 
     const playerIndex = identity ? (Number(identity.role.slice(1)) - 1 || 0) : null;
     const playerNumber = playerIndex !== null ? playerIndex : null;
+    const hostId = roomStatus?.hostId ?? null;
+    const isHost = hostId ? identity?.playerId === hostId : !roomStatus;
 
     useEffect(() => {
         if (!socket) {
@@ -570,7 +572,7 @@ export default function App() {
     }
 
     function handleReset() {
-        socketRef.current?.emit("reset");
+        if (!isHost) return;
     }
 
     function handleShowHistory() {
@@ -590,8 +592,9 @@ export default function App() {
     }
 
     function handlePlayerCountChange(next: number) {
-        setPlayerCount(next);
+        if (!isHost) return;
         if (!socketRef.current) return;
+        setPlayerCount(next);
         if (!gameState || gameState.phase !== "setup") return;
         socketRef.current.emit("room:setCapacity", { capacity: next });
     }
@@ -605,10 +608,13 @@ export default function App() {
         }
         return names.map((name, index) => {
             const role = (`p${index + 1}`) as RoomRole;
-            const connected = Boolean(roomStatus.roles?.[role]?.connected);
+            const slot = roomStatus.roles?.[role];
+            const connected = Boolean(slot?.connected);
             const ready = Boolean(gameState?.ready?.[index]);
             const isSelf = identity ? index === (Number(identity.role.slice(1)) - 1 || 0) : false;
-            return { name: name || defaultName(index), connected, ready, isSelf };
+            const isHostPlayer =
+                slot?.playerId && hostId ? slot.playerId === hostId : !hostId && index === 0;
+            return { name: name || defaultName(index), connected, ready, isSelf, isHost: isHostPlayer };
         });
     }
 
@@ -641,6 +647,7 @@ export default function App() {
                         onNameBlur={handleNameBlur}
                         onStart={handleStart}
                         onOpenHistory={handleShowHistory}
+                        isHost={isHost}
                         startDisabled={startDisabled}
                         localReady={localReady}
                         statusMessage={setupStatusMessage}
@@ -667,7 +674,7 @@ export default function App() {
                     soundEnabled={soundEnabled}
                     onToggleSound={(enabled) => {
                         setSoundEnabled(enabled);
-                        showToast(enabled ? "Sound aktiviert 🔊" : "Sound deaktiviert 🔇", 2000);
+                        showToast(enabled ? "Sound aktiviert ??" : "Sound deaktiviert ??", 2000);
                     }}
                 />
             );
@@ -688,7 +695,7 @@ export default function App() {
 
         return (
             <div className="flex flex-1 items-center justify-center text-amber-100/80">
-                Wähle einen Sitz, um dem Spiel beizutreten.
+                Waehl einen Sitz, um dem Spiel beizutreten.
             </div>
         );
     })();
@@ -702,8 +709,8 @@ export default function App() {
             if (maxScore > 0) {
                 showToast(
                     winner === "Draw"
-                        ? `🏆 Unentschieden mit ${maxScore} Punkten`
-                        : `🏆 ${winner} gewinnt mit ${maxScore} Punkten!`,
+                        ? `?? Unentschieden mit ${maxScore} Punkten`
+                        : `?? ${winner} gewinnt mit ${maxScore} Punkten!`,
                     4000,
                 );
             }
@@ -755,17 +762,17 @@ export default function App() {
                 <AlertDialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
                     <AlertDialogContent className="border-2 border-orange-500/30 bg-[#3d2549] text-amber-100">
                         <AlertDialogHeader>
-                            <AlertDialogTitle className="text-orange-300">So wird gespielt 🎲</AlertDialogTitle>
+                            <AlertDialogTitle className="text-orange-300">So wird gespielt</AlertDialogTitle>
                             <AlertDialogDescription className="text-amber-100/90">
-                                Erziele die meisten Punkte, indem du clevere Würfelkombinationen wählst.
+                                Erziele die meisten Punkte, indem du clevere Wuerfelkombinationen waehlst.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <div className="space-y-4 text-sm text-amber-100/90">
                             <div>
                                 <div className="mb-2 font-semibold text-orange-200">Spielablauf</div>
                                 <ul className="list-inside list-disc space-y-1">
-                                    <li>Bis zu drei Würfe pro Zug</li>
-                                    <li>Wähle Würfel aus, die gehalten werden sollen</li>
+                                    <li>Bis zu drei Wuerfe pro Zug</li>
+                                    <li>Waehle Wuerfel aus, die gehalten werden sollen</li>
                                     <li>Trage das Ergebnis in eine freie Kategorie ein</li>
                                     <li>Jede Kategorie kann nur einmal verwendet werden</li>
                                 </ul>
@@ -774,9 +781,9 @@ export default function App() {
                                 <div className="mb-2 font-semibold text-orange-200">Kombinationen</div>
                                 <ul className="list-inside list-disc space-y-1">
                                     <li>Full House: 3 gleiche + 2 gleiche (25 Punkte)</li>
-                                    <li>Kleine Straße: Vier in Folge (30 Punkte)</li>
-                                    <li>Große Straße: Fünf in Folge (40 Punkte)</li>
-                                    <li>Kniffel: Fünf gleiche (50 Punkte)</li>
+                                    <li>Kleine Strasse: Vier in Folge (30 Punkte)</li>
+                                    <li>Grosse Strasse: Fuenf in Folge (40 Punkte)</li>
+                                    <li>Kniffel: Fuenf gleiche (50 Punkte)</li>
                                 </ul>
                             </div>
                         </div>
@@ -791,3 +798,11 @@ export default function App() {
         </div>
     );
 }
+
+
+
+
+
+
+
+

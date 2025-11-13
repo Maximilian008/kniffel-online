@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 
-const PLAYER_ID_KEY = "yahtzee.playerId";
-const DISPLAY_NAME_KEY = "yahtzee.displayName";
+import { a2Key, ensureStorageMigration } from "../storage";
+
+const PLAYER_ID_KEY = a2Key("playerId");
+const DISPLAY_NAME_KEY = a2Key("displayName");
 
 function readLocalStorageValue(key: string) {
     if (typeof window === "undefined") return null;
+    ensureStorageMigration();
     try {
         const value = window.localStorage.getItem(key);
         return value && value.length > 0 ? value : null;
@@ -15,6 +18,7 @@ function readLocalStorageValue(key: string) {
 
 function writeLocalStorageValue(key: string, value: string) {
     if (typeof window === "undefined") return;
+    ensureStorageMigration();
     try {
         window.localStorage.setItem(key, value);
     } catch {
@@ -47,6 +51,7 @@ export function useIdentity() {
     useEffect(() => {
         if (displayName === undefined) {
             if (typeof window !== "undefined") {
+                ensureStorageMigration();
                 window.localStorage.removeItem(DISPLAY_NAME_KEY);
             }
             return;
@@ -54,6 +59,7 @@ export function useIdentity() {
         const trimmed = displayName.trim();
         if (!trimmed) {
             if (typeof window !== "undefined") {
+                ensureStorageMigration();
                 window.localStorage.removeItem(DISPLAY_NAME_KEY);
             }
             return;

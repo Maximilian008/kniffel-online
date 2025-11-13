@@ -41,6 +41,11 @@ NODE_ENV=development
 CORS_ORIGIN=http://localhost:5173
 ```
 
+Zusätzlich f�r die neue Einladungslogik:
+
+- `INVITE_SECRET`: Geheimnis zum Signieren der Einladungstoken (in Produktion zwingend setzen).
+- `INVITE_TTL_SECONDS`: G�ltigkeitsdauer neuer Einladungen in Sekunden (Standard: 3600).
+
 ## 🚀 Features
 
 ✅ **Core Game:**
@@ -118,3 +123,16 @@ Für den Remote-Zugriff zwischen Italien und Deutschland:
 2. HTTPS-Zertifikat einrichten
 3. Firewall-Konfiguration für Ports 80/443
 4. Umgebungsvariablen für Produktion setzen
+
+## Fehleranalyse & Checks
+
+Für reproduzierbare Fehleranalysen empfiehlt sich der Ablauf in `docs/ERROR_ANALYSIS.md`.  
+Die wichtigsten Helfer:
+
+```bash
+pnpm run check:type   # TypeScript / Builds
+pnpm run check:test   # Vitest-Suites
+pnpm run check:lint   # ESLint (Frontend)
+pnpm run check:smoke  # Smoke-Builds
+pnpm run check:done   # Alles in einem Rutsch
+```

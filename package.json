@@ -14,7 +14,12 @@
     "build:web": "pnpm run build:packages && pnpm --filter web build",
     "build:server": "pnpm run build:packages && pnpm --filter server build",
     "smoke:web": "node ./scripts/smoke-web.mjs",
-    "smoke:server": "node ./scripts/smoke-server.mjs"
+    "smoke:server": "node ./scripts/smoke-server.mjs",
+    "check:type": "pnpm -F web typecheck && pnpm -F server build && pnpm -F @shared/lib build",
+    "check:test": "pnpm -F web test && pnpm -F server test && pnpm -F @shared/lib test",
+    "check:lint": "pnpm -F web lint",
+    "check:smoke": "pnpm run smoke:web && pnpm run smoke:server",
+    "check:done": "pnpm run check:type && pnpm run check:test && pnpm run check:lint && pnpm run check:smoke"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

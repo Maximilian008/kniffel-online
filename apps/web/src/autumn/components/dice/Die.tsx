@@ -5,6 +5,7 @@ type DieProps = {
     held: boolean;
     onToggle: () => void;
     disabled?: boolean;
+    isRolling?: boolean;
 };
 
 function getPipPositions(value: number): Array<[number, number]> {
@@ -26,8 +27,11 @@ function getPipPositions(value: number): Array<[number, number]> {
     }
 }
 
-export function Die({ value, held, onToggle, disabled }: DieProps) {
+export function Die({ value, held, onToggle, disabled, isRolling }: DieProps) {
     const pips = getPipPositions(value);
+    const animateProps = isRolling
+        ? { rotate: [0, -8, 8, -8, 0], scale: [1, 1.05, 1, 1.05, 1] }
+        : { rotate: 0, scale: 1 };
 
     return (
         <motion.button
@@ -38,6 +42,8 @@ export function Die({ value, held, onToggle, disabled }: DieProps) {
                 ? "bg-green-500 shadow-[0_0_20px_4px_rgba(74,222,128,0.6)]"
                 : "bg-white shadow-lg hover:shadow-xl"
                 }`}
+            animate={animateProps}
+            transition={isRolling ? { duration: 0.45, ease: "easeInOut" } : { duration: 0.2 }}
             whileHover={!disabled ? { scale: 1.05 } : undefined}
             whileTap={!disabled ? { scale: 0.95 } : undefined}
         >
