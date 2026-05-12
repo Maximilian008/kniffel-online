@@ -2,7 +2,7 @@
 
 Ein professionelles Online-Kniffel-Spiel für zwei Spieler mit **ML-gestützten Zugempfehlungen** und AAA-Game-Quality UX.
 
-## 🎯 Architektur
+## Architektur
 
 - **Frontend**: React + TypeScript + Vite (Port 5173)
 - **Backend**: Node.js + Express + Socket.IO (Port 3000) 
@@ -41,7 +41,7 @@ NODE_ENV=development
 CORS_ORIGIN=http://localhost:5173
 ```
 
-## 🚀 Features
+## Features
 
 ✅ **Core Game:**
 - Vollständiges Kniffel-Spiel mit korrekten Regeln
@@ -63,9 +63,9 @@ CORS_ORIGIN=http://localhost:5173
 - **Responsive Design** für Desktop & Mobile
 - **Keyboard-Shortcuts** für Power-User
 
-## 🤖 ML-API
+## ML-API
 
-### POST /api/recommend
+### Ideen für Zuküfntige Ai impelentation
 
 Intelligente Zugempfehlungen basierend auf aktuellem Spielstand:
 
@@ -105,16 +105,7 @@ curl -X POST http://localhost:3000/api/recommend \
 - Health-Monitoring (`/healthz`)
 - Graceful Shutdown
 
-🚧 **In Entwicklung:**
+**In Entwicklung:**
 - Deployment-Konfiguration für Remote-Zugriff
 - SSL/HTTPS-Setup
 - Erweiterte Sicherheitsfeatures
-
-## Produktion
-
-Für den Remote-Zugriff zwischen Italien und Deutschland:
-
-1. Server auf einem VPS/Cloud-Provider deployen
-2. HTTPS-Zertifikat einrichten
-3. Firewall-Konfiguration für Ports 80/443
-4. Umgebungsvariablen für Produktion setzen
