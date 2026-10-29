@@ -9,13 +9,15 @@ Der Server schläft nicht ein, und der Spielverlauf bleibt dauerhaft gespeichert
 ## So wird gespielt
 
 1. Link öffnen. Wer als Erstes kommt, stellt die Spielerzahl (2–6) ein.
-2. Namen eingeben, einen freien Platz wählen und den Link mit den Mitspielern teilen.
-   Die Spielerzahl lässt sich in der Lobby noch ändern.
-3. Wenn alle **„Spiel starten“** gedrückt haben, geht es los. Pro Zug bis zu drei Würfe;
-   Würfel antippen hält sie fest, dann ein Feld im Block wählen.
-4. Wer die Seite neu lädt oder kurz die Verbindung verliert, landet automatisch wieder auf seinem Platz.
-   Auf einem anderen Gerät reicht es, denselben Namen und Platz zu wählen.
-   Verschwindet jemand ganz, kann nach 2 Minuten ein anderer seinen Platz (mit Punkten) übernehmen.
+2. Namen eingeben und **Mitspielen** drücken – man bekommt den nächsten freien Platz.
+   Mit **Mitspieler einladen** den Link per WhatsApp & Co. teilen.
+3. Wenn alle **„Spiel starten“** gedrückt haben, geht es los („Doch nicht bereit“ nimmt das zurück).
+   Pro Zug bis zu drei Würfe; Würfel antippen hält sie fest, dann ein Feld im Block wählen.
+   Wer dran ist, hört einen kurzen Ton, das Handy vibriert und der Tab-Titel zeigt „Du bist dran!“.
+4. Wer neu lädt oder kurz die Verbindung verliert, landet automatisch wieder auf seinem Platz.
+   Auf einem anderen Gerät reicht derselbe Name. Ist jemand länger als 2 Minuten weg, kann sein
+   Platz in der Lobby freigegeben oder (im Spiel, samt Punkten) übernommen werden.
+5. Ist der Tisch voll, kann man zuschauen und über das Menü einsteigen, sobald ein Platz frei wird.
 
 Wertung: Oberer Block mit 35 Bonuspunkten ab 63 Punkten; Full House 25, kleine Straße 30,
 große Straße 40, Kniffel 50. Ein zusätzlicher Kniffel-Bonus bzw. Joker-Regeln gibt es nicht.

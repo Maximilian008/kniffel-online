@@ -187,6 +187,27 @@ describe("seats", () => {
     expect(server.room.status().roles.p1).toMatchObject({ occupied: false });
   });
 
+  it("lets a player take back \"ready\"", async () => {
+    const { server, clients } = await lobby(["anna", "ben"]);
+    await clients[0].send("ready");
+    expect(server.room.data.game.ready).toEqual([true, false]);
+    await clients[0].send("ready", { ready: false });
+    expect(server.room.data.game.ready).toEqual([false, false]);
+    await clients[1].send("ready");
+    expect(server.room.data.game.phase).toBe("setup");
+  });
+
+  it("frees the seat of a player who left the lobby, but only after the grace period", async () => {
+    const { server, clients } = await lobby(["anna", "ben"]);
+    clients[1].disconnect();
+    await clients[0].send("room:freeSeat", { role: "p2" });
+    expect(clients[0].last("action-denied")?.message).toContain("erst kurz weg");
+    server.time += SEAT_RELEASE_GRACE_MS + 1;
+    await clients[0].send("room:freeSeat", { role: "p2" });
+    expect(server.room.status().roles.p2).toMatchObject({ occupied: false, name: null });
+    expect(server.room.data.game.playerNames).toEqual(["anna", ""]);
+  });
+
   it("restores seats 3-6 after a restart", async () => {
     const { server } = await lobby(["anna", "ben", "carl"]);
     const restarted = server.createRoom(JSON.parse(JSON.stringify(server.room.data)));

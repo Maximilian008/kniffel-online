@@ -12,6 +12,8 @@ type TopBarProps = {
     onOpenHistory: () => void;
     onOpenRoleModal?: () => void;
     onReleaseSeat?: () => void;
+    /** Menu text for onOpenRoleModal, e.g. "Mitspielen" for spectators. */
+    roleMenuLabel?: string;
     identityName?: string;
     identityLabel?: string;
     connectionHint?: string;
@@ -22,6 +24,7 @@ export function TopBar({
     onOpenHistory,
     onOpenRoleModal,
     onReleaseSeat,
+    roleMenuLabel = "Name / Platz ändern",
     identityLabel,
     identityName,
     connectionHint,
@@ -72,7 +75,7 @@ export function TopBar({
                             className="cursor-pointer gap-2 px-3 py-2"
                         >
                             <UserCog className="h-4 w-4" />
-                            Sitz verwalten
+                            {roleMenuLabel}
                         </DropdownMenuItem>
                     )}
                     {onReleaseSeat && (

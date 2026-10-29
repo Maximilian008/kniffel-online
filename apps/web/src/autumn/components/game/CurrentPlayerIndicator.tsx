@@ -3,9 +3,19 @@ import { motion } from "motion/react";
 type CurrentPlayerIndicatorProps = {
     playerName: string;
     rollsLeft: number;
+    /** The viewer is the player whose turn it is. */
+    isLocalTurn: boolean;
 };
 
-export function CurrentPlayerIndicator({ playerName, rollsLeft }: CurrentPlayerIndicatorProps) {
+export function CurrentPlayerIndicator({ playerName, rollsLeft, isLocalTurn }: CurrentPlayerIndicatorProps) {
+    const hint = isLocalTurn
+        ? rollsLeft === 3
+            ? "Zum Start würfeln"
+            : `Noch ${rollsLeft} ${rollsLeft === 1 ? "Wurf" : "Würfe"} übrig`
+        : rollsLeft === 3
+            ? `${playerName} hat noch nicht gewürfelt`
+            : `${playerName} hat noch ${rollsLeft} ${rollsLeft === 1 ? "Wurf" : "Würfe"}`;
+
     return (
         <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -25,13 +35,11 @@ export function CurrentPlayerIndicator({ playerName, rollsLeft }: CurrentPlayerI
                 className="inline-block"
             >
                 <h2 className="text-orange-300 drop-shadow-[0_2px_8px_rgba(251,146,60,0.8)]">
-                    {playerName ? `Am Zug: ${playerName}` : "Warten auf Mitspieler"}
+                    {isLocalTurn ? "Du bist am Zug!" : playerName ? `Am Zug: ${playerName}` : "Warten auf Mitspieler"}
                 </h2>
             </motion.div>
             <p className="mt-1 text-amber-200/70">
-                {rollsLeft === 3
-                    ? "Zum Start würfeln"
-                    : `Noch ${rollsLeft} ${rollsLeft === 1 ? "Wurf" : "Würfe"} übrig`}
+                {hint}
             </p>
         </motion.div>
     );

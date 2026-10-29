@@ -3,12 +3,11 @@ import type { CSSProperties } from "react";
 
 import { autumnCssVars, autumnSetupTokens } from "../../theme/tokens";
 import { Button } from "../../ui/button";
-import { Input } from "../../ui/input";
 
 // ──────────────────────────────────────────────────────────────
 // [UI: SetupScreen] Purpose: Setup panel for configuring a new lobby.
 // Dependencies: button (variant="autumn"), input, lucide icons, inline theme tokens.
-// Visible regions: Header, player counter, name input, lobby roster, seat list, footer actions.
+// Visible regions: Header, player counter, lobby roster, footer actions (invite, history, ready).
 // ──────────────────────────────────────────────────────────────
 
 export type SetupPlayer = {
@@ -16,6 +15,10 @@ export type SetupPlayer = {
     connected: boolean;
     ready: boolean;
     isSelf?: boolean;
+    /** Somebody has this seat (connected or not). */
+    occupied?: boolean;
+    /** Gone for longer than the grace period: others may free the seat. */
+    canFree?: boolean;
 };
 
 type SetupScreenProps = {
@@ -27,6 +30,9 @@ type SetupScreenProps = {
     localReady: boolean;
     statusMessage: string;
     players?: SetupPlayer[];
+    onFreeSeat?: (index: number) => void;
+    onInvite?: () => void;
+    inviteLabel?: string;
 };
 
 const setupVars = autumnCssVars.setup;
@@ -55,11 +61,6 @@ const labelStyle: CSSProperties = {
     fontWeight: 600,
     fontSize: "0.75rem",
     color: cssVar(setupVars.headingText, setupFallbacks.headingText),
-};
-
-const helperTextStyle: CSSProperties = {
-    fontSize: "0.75rem",
-    color: cssVar(setupVars.helperText, setupFallbacks.helperText),
 };
 
 function lobbyBadgeStyle({ ready, connected }: { ready: boolean; connected: boolean }): CSSProperties {
@@ -104,7 +105,7 @@ function lobbyBadgeText(ready: boolean, connected: boolean) {
     }
 
     if (connected) {
-        return "Offen";
+        return "Noch nicht bereit";
     }
 
     return "Nicht verbunden";
@@ -119,23 +120,11 @@ export function SetupScreen({
     localReady,
     statusMessage,
     players,
+    onFreeSeat,
+    onInvite,
+    inviteLabel = "📨 Mitspieler einladen",
 }: SetupScreenProps) {
     const roster = players ?? [];
-
-    const seats = Array.from({ length: playerCount }, (_, index) => {
-        const player = roster[index];
-        const trimmedName = player?.name?.trim() ?? "";
-        const isSelf = Boolean(player?.isSelf);
-        const displayName = trimmedName.length > 0 ? trimmedName : `Spieler ${index + 1}`;
-
-        return {
-            index,
-            isSelf,
-            connected: Boolean(player?.connected),
-            ready: Boolean(player?.ready),
-            name: displayName,
-        };
-    });
 
     return (
         <div
@@ -235,8 +224,28 @@ export function SetupScreen({
                                                         {player.isSelf ? `${resolvedName} (Du)` : resolvedName}
                                                     </span>
                                                     <span style={{ fontSize: "0.75rem", color: cssVar(setupVars.helperText, setupFallbacks.helperText) }}>
-                                                        {connected ? "Verbunden" : "Nicht verbunden"}
+                                                        {connected ? "Verbunden" : player.canFree ? "Seit über 2 Minuten weg" : "Nicht verbunden"}
                                                     </span>
+                                                    {player.canFree && onFreeSeat && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => onFreeSeat(index)}
+                                                            style={{
+                                                                alignSelf: "flex-start",
+                                                                marginTop: "0.25rem",
+                                                                fontSize: "0.75rem",
+                                                                fontWeight: 600,
+                                                                textDecoration: "underline",
+                                                                color: cssVar(setupVars.rootText, setupFallbacks.rootText),
+                                                                background: "none",
+                                                                border: "none",
+                                                                padding: 0,
+                                                                cursor: "pointer",
+                                                            }}
+                                                        >
+                                                            Platz freigeben
+                                                        </button>
+                                                    )}
                                                 </div>
                                                 <span
                                                     className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
@@ -253,49 +262,6 @@ export function SetupScreen({
                         </div>
                     </section>
 
-                    {seats.length > 0 && (
-                        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                            <span style={labelStyle}>Spielerliste</span>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                                {seats.map((seat) => {
-                                    return (
-                                        <div key={`seat-input-${seat.index}`} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                            <span style={{ fontWeight: 600 }}>{`Spieler ${seat.index + 1}`}</span>
-                                            <div
-                                                style={{
-                                                    position: "relative",
-                                                    backgroundColor: cssVar(setupVars.cardBackground, setupFallbacks.cardBackground),
-                                                    borderRadius: "0.6rem",
-                                                    border: `1px solid ${cssVar(setupVars.cardBorder, setupFallbacks.cardBorder)}`,
-                                                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4)",
-                                                }}
-                                            >
-                                                <Input
-                                                    value={seat.name}
-                                                    aria-label={`Spieler ${seat.index + 1}`}
-                                                    readOnly
-                                                    tabIndex={-1}
-                                                    className={`h-11 w-full border-0 bg-transparent text-base font-medium placeholder:text-[var(${setupVars.rootText})] focus-visible:ring-0`}
-                                                    style={{
-                                                        color: cssVar(setupVars.inputText, setupFallbacks.inputText),
-                                                        padding: "0 0.875rem",
-                                                        borderRadius: "0.6rem",
-                                                    }}
-                                                />
-                                            </div>
-                                            <span style={helperTextStyle}>
-                                                {seat.ready
-                                                    ? "Spieler ist bereit."
-                                                    : seat.connected
-                                                        ? "Wartet auf Startsignal."
-                                                        : "Noch nicht verbunden."}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </section>
-                    )}
                 </div>
 
                 <footer style={{ marginTop: "2rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -309,6 +275,17 @@ export function SetupScreen({
                         {statusMessage}
                     </span>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        {onInvite && (
+                            <Button
+                                type="button"
+                                variant="autumn"
+                                onClick={onInvite}
+                                className="rounded-full text-sm font-semibold"
+                                style={{ padding: "0.9rem", textTransform: "none", color: "#ffffff" }}
+                            >
+                                {inviteLabel}
+                            </Button>
+                        )}
                         <Button
                             type="button"
                             variant="autumn"
@@ -326,7 +303,7 @@ export function SetupScreen({
                             className="rounded-full text-sm font-semibold"
                             style={{ padding: "0.9rem", textTransform: "none", color: "#ffffff" }}
                         >
-                            {localReady ? "Warten auf Mitspieler" : "Spiel starten 🎲"}
+                            {localReady ? "Doch nicht bereit" : "Spiel starten 🎲"}
                         </Button>
                     </div>
                 </footer>

@@ -229,6 +229,12 @@ export class SoundManager {
     });
   }
 
+  yourTurn() {
+    // Short two-note chime when it becomes the player's turn
+    this.playTone(523, 0.12, "sine");
+    setTimeout(() => this.playTone(784, 0.18, "sine"), 130);
+  }
+
   levelUpSound() {
     // For reaching new scoring milestones
     const ascendingNotes = [261, 329, 392, 523, 659];

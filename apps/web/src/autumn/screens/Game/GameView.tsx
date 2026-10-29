@@ -14,7 +14,8 @@ export type PlayerStatus = { connected: boolean; ready: boolean };
 
 type GameViewProps = {
     state: GameState;
-    playerIndex: number;
+    /** null for spectators */
+    playerIndex: number | null;
     playerNames: string[];
     isCurrentPlayer: boolean;
     isRolling: boolean;
@@ -133,6 +134,7 @@ export function GameView({
             <CurrentPlayerIndicator
                 playerName={playerNames[state.currentPlayer] || `Spieler ${state.currentPlayer + 1}`}
                 rollsLeft={rollsLeft}
+                isLocalTurn={isCurrentPlayer}
             />
 
             <DiceArea

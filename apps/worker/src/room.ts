@@ -178,7 +178,10 @@ export class Room {
 
     switch (message.type) {
       case "ready":
-        this.apply(connection, setReady(this.data.game, seat, true, this.env.now()));
+        this.apply(connection, setReady(this.data.game, seat, data.ready !== false, this.env.now()));
+        return;
+      case "room:freeSeat":
+        this.freeAbsentSeat(connection, roleToSeat(data.role));
         return;
       case "roll":
         this.apply(connection, roll(this.data.game, seat, this.env.random));
@@ -327,6 +330,17 @@ export class Room {
       this.transport.update(other);
       this.transport.send(other.id, "room:roleRevoked", { reason });
     }
+  }
+
+  /** In the lobby, anybody seated may free the seat of a player who has been gone for a while. */
+  private freeAbsentSeat(connection: Connection, seat: number | null): void {
+    if (seat === null || seat >= this.capacity || this.data.seats[seat].playerId === null) return;
+    if (this.data.game.phase !== "setup") return this.deny(connection, "Plätze können nur in der Lobby freigegeben werden.");
+    const { lastSeen } = this.data.seats[seat];
+    const away = !this.isSeatConnected(seat) && lastSeen !== null && this.env.now() >= lastSeen + SEAT_RELEASE_GRACE_MS;
+    if (!away) return this.deny(connection, "Dieser Spieler ist noch da oder erst kurz weg.");
+    this.vacate(seat);
+    this.broadcastRoom();
   }
 
   private changeCapacity(connection: Connection, requested: unknown): void {

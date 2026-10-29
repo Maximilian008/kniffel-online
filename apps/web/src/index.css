@@ -161,10 +161,6 @@
     padding: 24px;
   }
 
-  .modal-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 }
 
 .role-button--own {
@@ -236,4 +232,45 @@
 .modal-stepper button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Primary action of the seat dialog ("Mitspielen" / "Zuschauen") */
+.modal-primary {
+  width: 100%;
+  margin: 4px 0 16px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f97316, #f59e0b);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.45);
+  transition: filter 0.2s ease, opacity 0.2s ease;
+}
+
+.modal-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.modal-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Manual seat choice, collapsed by default */
+.modal-seats summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.modal-seats .role-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
 }

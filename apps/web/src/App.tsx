@@ -11,6 +11,7 @@ import {
 } from "@kniffel/game";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatedBackground } from "./autumn/components/common/AnimatedBackground";
+import { ConnectionBanner } from "./autumn/components/common/ConnectionBanner";
 import { StatusToast } from "./autumn/components/common/StatusToast";
 import { TopBar } from "./autumn/components/common/TopBar";
 import { FinishedView } from "./autumn/screens/Game/FinishedView";
@@ -89,26 +90,28 @@ function transformHistoryEntries(entries: HistoryEntry[]): HistoryGame[] {
 
 function getSetupStatusMessage(args: {
     connectionPhase: ConnectionPhase;
-    opponentConnected: boolean;
-    localReady: boolean;
-    opponentReady: boolean;
+    isSeated: boolean;
+    players: SetupPlayer[];
 }) {
     if (args.connectionPhase === "connecting") {
         return "Verbindung zum Spielserver wird hergestellt...";
     }
-    if (args.connectionPhase === "waiting") {
-        return "Warten auf weitere Spieler...";
+    if (!args.isSeated) {
+        return "Du schaust zu. Über das Menü oben rechts kannst du mitspielen.";
     }
-    if (!args.opponentConnected) {
-        return "Teile den Link, damit Mitspieler beitreten können.";
+    const freeSeats = args.players.filter((player) => !player.occupied).length;
+    if (freeSeats > 0) {
+        return freeSeats === 1
+            ? "Es fehlt noch 1 Mitspieler – lade jemanden ein!"
+            : `Es fehlen noch ${freeSeats} Mitspieler – lade sie ein!`;
     }
-    if (!args.opponentReady) {
-        return "Mitspieler sind verbunden. Warten auf Start.";
+    const waitingFor = args.players.filter((player) => !player.ready);
+    if (waitingFor.length === 0) {
+        return "Alle Spieler sind bereit!";
     }
-    if (!args.localReady) {
-        return "Drücke \"Spiel starten\", wenn du bereit bist.";
-    }
-    return "Alle Spieler sind bereit!";
+    const readyCount = args.players.length - waitingFor.length;
+    const names = waitingFor.map((player) => (player.isSelf ? "du" : player.name)).join(", ");
+    return `${readyCount} von ${args.players.length} bereit – noch nicht bereit: ${names}`;
 }
 
 function getTopBarHint(
@@ -129,6 +132,7 @@ export default function App() {
     const socketRef = useRef<AppSocket | null>(null);
     const [socket, setSocket] = useState<AppSocket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
+    const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [history, setHistory] = useState<HistoryEntry[]>(loadHistoryCache);
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -160,6 +164,7 @@ export default function App() {
 
         instance.on("connect", () => {
             setIsConnected(true);
+            setHasConnectedOnce(true);
             setIsRolling(false);
         });
         instance.on("disconnect", () => setIsConnected(false));
@@ -306,11 +311,20 @@ export default function App() {
 
     const topBarHint = getTopBarHint(connectionPhase, gameState?.phase ?? null, opponentConnected);
 
+    // Ticks while in the lobby so "Platz freigeben" appears once a player has been gone long enough.
+    const [now, setNow] = useState(() => Date.now());
+    const inLobby = gameState?.phase === "setup";
+    useEffect(() => {
+        if (!inLobby) return;
+        const id = window.setInterval(() => setNow(Date.now()), 5_000);
+        return () => window.clearInterval(id);
+    }, [inLobby]);
+
+    const setupPlayers = getSetupPlayers();
     const setupStatusMessage = getSetupStatusMessage({
         connectionPhase,
-        opponentConnected,
-        localReady,
-        opponentReady: playerStatuses.some((status, index) => index !== playerIndex && status.ready),
+        isSeated: identity !== null,
+        players: setupPlayers ?? [],
     });
 
     const historyGames = useMemo(() => transformHistoryEntries(history), [history]);
@@ -326,9 +340,35 @@ export default function App() {
         return true;
     }
 
-    function handleStart() {
+    function handleToggleReady() {
         if (playerIndex === null || !identity) return;
-        sendAction((socket) => socket.emit("ready"));
+        sendAction((socket) => socket.emit("ready", { ready: !localReady }));
+    }
+
+    function handleFreeSeat(index: number) {
+        const role = `p${index + 1}` as RoomRole;
+        const name = gameState?.playerNames[index] || defaultName(index);
+        if (!window.confirm(`${name} ist seit über 2 Minuten weg. Platz freigeben?`)) return;
+        sendAction((socket) => socket.emit("room:freeSeat", { role }));
+    }
+
+    const [inviteCopied, setInviteCopied] = useState(false);
+    async function handleInvite() {
+        const url = window.location.origin;
+        const text = "Spiel mit mir Kniffel! 🎲";
+        try {
+            if (navigator.share) {
+                await navigator.share({ title: "Herbstwürfel – Kniffel", text, url });
+                return;
+            }
+            await navigator.clipboard.writeText(url);
+            setInviteCopied(true);
+            window.setTimeout(() => setInviteCopied(false), 2500);
+            showToast("Link kopiert – schick ihn deinen Mitspielern.");
+        } catch (error) {
+            if ((error as DOMException)?.name === "AbortError") return; // share sheet closed
+            showToast(`Schick deinen Mitspielern diesen Link: ${url}`, 6000);
+        }
     }
 
     function handleRoll() {
@@ -345,6 +385,16 @@ export default function App() {
 
     function handleReset() {
         sendAction((socket) => socket.emit("reset"));
+    }
+
+    function handleReleaseSeat() {
+        if (
+            gameState?.phase === "playing" &&
+            !window.confirm("Wirklich abmelden? Dein Platz wird frei und jemand anderes kann mit deinen Punkten weiterspielen.")
+        ) {
+            return;
+        }
+        releaseRole();
     }
 
     function handleShowHistory() {
@@ -377,10 +427,13 @@ export default function App() {
         }
         return names.map((name, index) => {
             const role = (`p${index + 1}`) as RoomRole;
-            const connected = Boolean(roomStatus.roles?.[role]?.connected);
+            const seat = roomStatus.roles?.[role];
+            const connected = Boolean(seat?.connected);
             const ready = Boolean(gameState?.ready?.[index]);
             const isSelf = index === playerIndex;
-            return { name: name || defaultName(index), connected, ready, isSelf };
+            const canFree =
+                identity !== null && !connected && seat?.releaseDeadline != null && seat.releaseDeadline <= now;
+            return { name: name || defaultName(index), connected, ready, isSelf, canFree, occupied: Boolean(seat?.occupied) };
         });
     }
 
@@ -399,18 +452,21 @@ export default function App() {
                     <SetupScreen
                         playerCount={playerCount}
                         onPlayerCountChange={handlePlayerCountChange}
-                        onStart={handleStart}
+                        onStart={handleToggleReady}
                         onOpenHistory={handleShowHistory}
                         startDisabled={startDisabled}
                         localReady={localReady}
                         statusMessage={setupStatusMessage}
-                        players={getSetupPlayers()}
+                        players={setupPlayers}
+                        onFreeSeat={handleFreeSeat}
+                        onInvite={identity ? handleInvite : undefined}
+                        inviteLabel={inviteCopied ? "✓ Link kopiert" : undefined}
                     />
                 </div>
             );
         }
 
-        if (gameState.phase === "playing" && playerIndex !== null) {
+        if (gameState.phase === "playing") {
             return (
                 <GameView
                     state={gameState}
@@ -453,6 +509,18 @@ export default function App() {
         );
     })();
 
+    // Tell players it is their turn, also when the tab is in the background or the phone lies around.
+    const wasMyTurnRef = useRef(false);
+    useEffect(() => {
+        const baseTitle = "Herbstwürfel – Kniffel online";
+        if (isCurrentPlayer && !wasMyTurnRef.current) {
+            soundManager.yourTurn();
+            navigator.vibrate?.(200);
+        }
+        wasMyTurnRef.current = isCurrentPlayer;
+        document.title = isCurrentPlayer ? "🎲 Du bist dran! – Herbstwürfel" : baseTitle;
+    }, [isCurrentPlayer]);
+
     const previousPhaseRef = useRef<GamePhase | null>(null);
     useEffect(() => {
         const currentPhase = gameState?.phase ?? null;
@@ -475,13 +543,15 @@ export default function App() {
     return (
         <div className="min-h-screen w-full overflow-x-hidden bg-transparent text-amber-100">
             <AnimatedBackground />
+            <ConnectionBanner isVisible={hasConnectedOnce && !isConnected} />
             <div className="relative z-10 flex min-h-screen flex-col">
                 <TopBar
                     onHelp={() => setIsHelpOpen(true)}
                     onOpenHistory={handleShowHistory}
                     onOpenRoleModal={openModal}
-                    onReleaseSeat={identity ? releaseRole : undefined}
-                    identityLabel={identity ? ROLE_LABELS[identity.role] : undefined}
+                    roleMenuLabel={identity ? undefined : "Mitspielen"}
+                    onReleaseSeat={identity ? handleReleaseSeat : undefined}
+                    identityLabel={identity ? ROLE_LABELS[identity.role] : isConnected ? "Zuschauer" : undefined}
                     identityName={identity?.name}
                     connectionHint={topBarHint}
                 />

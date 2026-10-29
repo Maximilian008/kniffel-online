@@ -17,6 +17,8 @@ type Props = {
 
 type RoleEntry = {
   role: RoomRole;
+  /** The seat can be taken (free, reserved for this name, or its player is gone). */
+  available: boolean;
   disabled: boolean;
   description: string;
   countdown: string | null;
@@ -64,6 +66,7 @@ export default function RoleSelectModal({
       if (!slot) {
         return {
           role,
+          available: false,
           disabled: !trimmed,
           description: "Status unbekannt",
           countdown: null,
@@ -80,6 +83,7 @@ export default function RoleSelectModal({
       if (!slot.occupied) {
         return {
           role,
+          available: true,
           disabled: !trimmed,
           description: "Frei - jetzt reservieren",
           countdown: null,
@@ -90,6 +94,7 @@ export default function RoleSelectModal({
       if (sameName) {
         return {
           role,
+          available: !slot.connected,
           disabled: !trimmed,
           description: slot.connected ? "Bereits verbunden" : "Reserviert für dich",
           countdown,
@@ -101,6 +106,7 @@ export default function RoleSelectModal({
       if (!slot.connected && slot.releaseDeadline !== null && slot.releaseDeadline <= now) {
         return {
           role,
+          available: true,
           disabled: !trimmed,
           description: `Frei – ${slot.name ?? "jemand"} ist nicht mehr verbunden`,
           countdown: null,
@@ -111,6 +117,7 @@ export default function RoleSelectModal({
       const connectionStatus = slot.connected ? "verbunden" : "nicht verbunden";
       return {
         role,
+        available: false,
         disabled: true,
         description: `Belegt von ${slot.name ?? "jemand"} (${connectionStatus})`,
         countdown,
@@ -119,26 +126,33 @@ export default function RoleSelectModal({
     });
   }, [status, trimmed, lowerTrimmed, now]);
 
+  // "Mitspielen" takes the seat reserved for this name, otherwise the first free one.
+  const ownSeat = roleEntries.find((entry) => entry.isReservedForYou && entry.available);
+  const joinSeat = ownSeat ?? roleEntries.find((entry) => entry.available);
+  const tableFull = Boolean(status) && !joinSeat;
+  const join = () => {
+    if (joinSeat && trimmed) onClaim(joinSeat.role, trimmed);
+  };
+
   if (!isOpen) {
     return null;
   }
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="role-modal-title">
       <div className="modal">
         <header className="modal-header">
-          <h2>Wer bist du?</h2>
-          {trimmed && (
-            <button className="modal-close" onClick={onClose} aria-label="Fenster schließen">
-              x
-            </button>
-          )}
+          <h2 id="role-modal-title">Wer bist du?</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Fenster schließen">
+            x
+          </button>
         </header>
         <p className="modal-description">
-          Reserviere eine Rolle und gib deinen Anzeigenamen ein. Wenn du bereits gespielt hast,
-          wähle dieselbe Kombination, um sofort wieder einzusteigen.
+          {tableFull
+            ? "Der Tisch ist gerade voll. Du kannst zuschauen und einsteigen, sobald ein Platz frei wird."
+            : "Gib deinen Namen ein und spiel mit. Wenn du schon dabei warst, nimm denselben Namen – dann kommst du auf deinen Platz zurück."}
         </p>
-        {status && onPlayerCountChange ? (
+        {status && onPlayerCountChange && (
           <div className="modal-player-count">
             <span className="modal-label">Wie viele spielen mit?</span>
             <div className="modal-stepper">
@@ -161,14 +175,10 @@ export default function RoleSelectModal({
               </button>
             </div>
           </div>
-        ) : status && (
-          <p className="modal-hint" style={{ marginTop: 4, marginBottom: 8, color: '#666' }}>
-            Spielerzahl: <strong>{Math.max(2, Math.min(6, status.capacity || 2))}</strong>
-          </p>
         )}
 
         <label className="modal-label" htmlFor="player-name-input">
-          Anzeigename
+          Dein Name
         </label>
         <input
           id="player-name-input"
@@ -176,45 +186,55 @@ export default function RoleSelectModal({
           type="text"
           value={name}
           maxLength={MAX_LENGTH}
+          autoComplete="nickname"
           onChange={(event) => {
             setName(event.target.value.slice(0, MAX_LENGTH));
             if (error) clearError();
           }}
-          placeholder="Name"
+          onKeyDown={(event) => {
+            if (event.key === "Enter") join();
+          }}
+          placeholder="z. B. Oma Erika"
         />
         {error && <p className="modal-error">{error}</p>}
 
-        <div
-          className="role-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: 12,
-            maxHeight: 320,
-            overflowY: 'auto',
-            paddingRight: 4,
-          }}
-        >
-          {roleEntries.map((entry) => {
-            const claiming = isClaiming === entry.role;
-            return (
-              <button
-                key={entry.role}
-                type="button"
-                className={`role-button${entry.isReservedForYou ? " role-button--own" : ""}`}
-                disabled={entry.disabled || claiming}
-                onClick={() => onClaim(entry.role, trimmed || name)}
-              >
-                <span className="role-title">{ROLE_LABELS[entry.role]}</span>
-                <span className="role-status">{entry.description}</span>
-                {entry.countdown && (
-                  <span className="role-countdown">{entry.countdown}</span>
-                )}
-                {claiming && <span className="role-progress">Verbinde ...</span>}
-              </button>
-            );
-          })}
-        </div>
+        {tableFull ? (
+          <button type="button" className="modal-primary" onClick={onClose}>
+            Zuschauen
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="modal-primary"
+            disabled={!trimmed || !joinSeat || isClaiming !== null}
+            onClick={join}
+          >
+            {isClaiming ? "Verbinde …" : ownSeat ? `Weiterspielen als ${ROLE_LABELS[ownSeat.role]}` : "Mitspielen"}
+          </button>
+        )}
+
+        <details className="modal-seats">
+          <summary>Bestimmten Platz wählen</summary>
+          <div className="role-grid">
+            {roleEntries.map((entry) => {
+              const claiming = isClaiming === entry.role;
+              return (
+                <button
+                  key={entry.role}
+                  type="button"
+                  className={`role-button${entry.isReservedForYou ? " role-button--own" : ""}`}
+                  disabled={entry.disabled || claiming}
+                  onClick={() => onClaim(entry.role, trimmed || name)}
+                >
+                  <span className="role-title">{ROLE_LABELS[entry.role]}</span>
+                  <span className="role-status">{entry.description}</span>
+                  {entry.countdown && <span className="role-countdown">{entry.countdown}</span>}
+                  {claiming && <span className="role-progress">Verbinde ...</span>}
+                </button>
+              );
+            })}
+          </div>
+        </details>
       </div>
     </div>
   );

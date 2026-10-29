@@ -172,9 +172,8 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
 
   const openModal = useCallback(() => setModalOpen(true), []);
 
-  const closeModal = useCallback(() => {
-    if (identity) setModalOpen(false);
-  }, [identity]);
+  /** Without a seat, closing the dialog means watching the game. */
+  const closeModal = useCallback(() => setModalOpen(false), []);
 
   const clearError = useCallback(() => setError(null), []);
 

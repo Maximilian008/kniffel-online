@@ -70,7 +70,9 @@ export interface ClientEvents {
   "room:claimRole": { role: Role; name: string; playerId: string };
   "room:releaseRole": undefined;
   "room:setCapacity": { capacity: number };
-  ready: undefined;
+  /** Omitted or true: ready; { ready: false } takes it back. */
+  ready: { ready: boolean } | undefined;
+  "room:freeSeat": { role: Role };
   roll: undefined;
   "toggle-hold": { index: number };
   choose: { category: string };
