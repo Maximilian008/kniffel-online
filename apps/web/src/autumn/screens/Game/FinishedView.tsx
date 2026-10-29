@@ -1,19 +1,20 @@
 import { Trophy } from "lucide-react";
-import type { SerializedGameState } from "../../../types/shared";
+import type { GameState } from "@kniffel/game";
 import { Scoreboard } from "../../components/game/Scoreboard";
 import { Button } from "../../ui/button";
 
 type FinishedViewProps = {
-    state: SerializedGameState;
+    state: GameState;
     playerNames: string[];
     scores: number[];
-    winner: string;
+    /** null when the game ended in a draw */
+    winner: string | null;
     onReset: () => void;
     onOpenHistory: () => void;
 };
 
 export function FinishedView({ state, playerNames, scores, winner, onReset, onOpenHistory }: FinishedViewProps) {
-    const winnerText = winner === "Draw" ? "Unentschieden" : `${winner} gewinnt!`;
+    const winnerText = winner === null ? "Unentschieden" : `${winner} gewinnt!`;
     const bestScore = Math.max(...scores);
     const gradientButtonClass =
         "bg-gradient-to-r from-orange-500 via-amber-500 to-amber-400 text-white shadow-[0_0_20px_rgba(249,115,22,0.45)] hover:from-orange-600 hover:via-amber-500 hover:to-amber-500";

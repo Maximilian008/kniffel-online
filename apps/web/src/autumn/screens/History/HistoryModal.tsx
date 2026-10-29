@@ -92,7 +92,7 @@ export function HistoryModal({ isOpen, onClose, history, onRefresh, isLoading }:
                                             <div className="flex items-center gap-2 text-sm sm:ml-6" style={{ color: buttonSubTextColor }}>
                                                 <Trophy className="h-4 w-4 text-amber-600" />
                                                 <span>
-                                                    {game.winner} gewann mit {" "}
+                                                    {game.winner === null ? "Unentschieden mit" : `${game.winner} gewann mit`}{" "}
                                                     <span className="font-semibold" style={{ color: winnerAccentColor }}>
                                                         {game.winnerScore}
                                                     </span>{" "}

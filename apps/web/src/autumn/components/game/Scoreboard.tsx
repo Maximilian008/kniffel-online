@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
-import type { Category, ScoreSheet } from "../../../types/shared";
+import { totalScore, upperBonus, upperSubtotal, type Category, type ScoreSheet } from "@kniffel/game";
 import { Button } from "../../ui/button";
 
 type ScoreboardProps = {
@@ -35,21 +35,6 @@ const SCOREBOARD_CATEGORIES: ScoreCategory[] = [
     { key: "yahtzee", name: "Kniffel", section: "lower" },
     { key: "chance", name: "Chance", section: "lower" },
 ];
-
-const UPPER_KEYS: Category[] = ["ones", "twos", "threes", "fours", "fives", "sixes"];
-
-function calculateUpperSubtotal(sheet: ScoreSheet) {
-    return UPPER_KEYS.reduce((sum, category) => sum + (sheet[category] ?? 0), 0);
-}
-
-function calculateBonus(sheet: ScoreSheet) {
-    return calculateUpperSubtotal(sheet) >= 63 ? 35 : 0;
-}
-
-function calculateTotal(sheet: ScoreSheet) {
-    const base = SCOREBOARD_CATEGORIES.reduce((sum, category) => sum + (sheet[category.key] ?? 0), 0);
-    return base + calculateBonus(sheet);
-}
 
 export function Scoreboard({
     scoreSheets,
@@ -258,7 +243,7 @@ export function Scoreboard({
                                             key={`mobile-${absoluteIndex}`}
                                             className="md:hidden border-r border-orange-800/20 p-3 text-center text-orange-900 last:border-r-0"
                                         >
-                                            {calculateUpperSubtotal(player.sheet)}
+                                            {upperSubtotal(player.sheet)}
                                         </td>
                                     );
                                 })}
@@ -267,7 +252,7 @@ export function Scoreboard({
                                         key={`desktop-${index}`}
                                         className="hidden border-r border-orange-800/20 p-3 text-center text-orange-900 last:border-r-0 md:table-cell"
                                     >
-                                        {calculateUpperSubtotal(player.sheet)}
+                                        {upperSubtotal(player.sheet)}
                                     </td>
                                 ))}
                             </tr>
@@ -276,8 +261,8 @@ export function Scoreboard({
                                 <td className="border-r border-orange-800/20 p-3 text-orange-900">Bonus (≥63)</td>
                                 {visiblePlayers.map((player, idx) => {
                                     const absoluteIndex = viewStartIndex + idx;
-                                    const bonus = calculateBonus(player.sheet);
-                                    const subtotal = calculateUpperSubtotal(player.sheet);
+                                    const bonus = upperBonus(player.sheet);
+                                    const subtotal = upperSubtotal(player.sheet);
                                     const label = bonus > 0 ? bonus : "-";
                                     return (
                                         <td
@@ -292,8 +277,8 @@ export function Scoreboard({
                                     );
                                 })}
                                 {players.map((player, index) => {
-                                    const bonus = calculateBonus(player.sheet);
-                                    const subtotal = calculateUpperSubtotal(player.sheet);
+                                    const bonus = upperBonus(player.sheet);
+                                    const subtotal = upperSubtotal(player.sheet);
                                     const label = bonus > 0 ? bonus : "-";
                                     return (
                                         <td
@@ -346,7 +331,7 @@ export function Scoreboard({
                                             key={`mobile-${absoluteIndex}`}
                                             className="md:hidden border-r border-orange-800/20 p-3 text-center text-orange-900 last:border-r-0"
                                         >
-                                            {calculateTotal(player.sheet)}
+                                            {totalScore(player.sheet)}
                                         </td>
                                     );
                                 })}
@@ -355,7 +340,7 @@ export function Scoreboard({
                                         key={`desktop-${index}`}
                                         className="hidden border-r border-orange-800/20 p-3 text-center text-orange-900 last:border-r-0 md:table-cell"
                                     >
-                                        {calculateTotal(player.sheet)}
+                                        {totalScore(player.sheet)}
                                     </td>
                                 ))}
                             </tr>

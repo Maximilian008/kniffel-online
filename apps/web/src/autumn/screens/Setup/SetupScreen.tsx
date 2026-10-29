@@ -177,6 +177,7 @@ export function SetupScreen({
                                 type="button"
                                 size="icon"
                                 variant="autumn"
+                                aria-label="Einen Spieler weniger"
                                 onClick={() => onPlayerCountChange(Math.max(2, playerCount - 1))}
                                 disabled={playerCount <= 2}
                                 className="rounded-full"
@@ -191,6 +192,7 @@ export function SetupScreen({
                                 type="button"
                                 size="icon"
                                 variant="autumn"
+                                aria-label="Einen Spieler mehr"
                                 onClick={() => onPlayerCountChange(Math.min(6, playerCount + 1))}
                                 disabled={playerCount >= 6}
                                 className="rounded-full"

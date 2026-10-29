@@ -21,35 +21,14 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
-    "allowJs": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
-    "baseUrl": ".",
-    "paths": {
-      "@game/rules": [
-        "../../packages/game-rules/src"
-      ],
-      "@shared/lib": [
-        "../../packages/shared/dist/index.d.ts",
-        "../../packages/shared/src/index.ts"
-      ]
-    }
+    "noUncheckedSideEffectImports": true
   },
   "include": [
-    "src",
-    "vite.config.ts",
-    "vite-env.d.ts"
-  ],
-  "references": [
-    {
-      "path": "../../packages/game-rules"
-    },
-    {
-      "path": "../../packages/shared"
-    }
+    "src"
   ]
 }

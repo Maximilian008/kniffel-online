@@ -1,11 +1,9 @@
 import { Trophy } from "lucide-react";
-import type { Category } from "../../../types/shared";
-
-type PlayerScoreMap = Record<Category, number | null>;
+import { lowerSubtotal, upperBonus, upperSubtotal, type ScoreSheet } from "@kniffel/game";
 
 type HistoryPlayer = {
     name: string;
-    scores: PlayerScoreMap;
+    scores: ScoreSheet;
     total: number;
 };
 
@@ -13,40 +11,10 @@ type HistoryGame = {
     id: string;
     date: string;
     players: HistoryPlayer[];
-    winner: string;
+    /** null when the game ended in a draw */
+    winner: string | null;
     winnerScore: number;
 };
-
-const UPPER: Array<{ key: Category; label: string }> = [
-    { key: "ones", label: "Einser" },
-    { key: "twos", label: "Zweier" },
-    { key: "threes", label: "Dreier" },
-    { key: "fours", label: "Vierer" },
-    { key: "fives", label: "Fünfer" },
-    { key: "sixes", label: "Sechser" },
-];
-
-const LOWER: Array<{ key: Category; label: string }> = [
-    { key: "threeKind", label: "Dreier Pasch" },
-    { key: "fourKind", label: "Vierer Pasch" },
-    { key: "fullHouse", label: "Full House" },
-    { key: "smallStraight", label: "Kleine Straße" },
-    { key: "largeStraight", label: "Große Straße" },
-    { key: "yahtzee", label: "Kniffel" },
-    { key: "chance", label: "Chance" },
-];
-
-function upperSubtotal(scores: PlayerScoreMap) {
-    return UPPER.reduce((total, category) => total + (scores[category.key] ?? 0), 0);
-}
-
-function bonus(scores: PlayerScoreMap) {
-    return upperSubtotal(scores) >= 63 ? 35 : 0;
-}
-
-function lowerSubtotal(scores: PlayerScoreMap) {
-    return LOWER.reduce((total, category) => total + (scores[category.key] ?? 0), 0);
-}
 
 const palette = {
     text: "#6b3f23",
@@ -74,7 +42,7 @@ export function CompactScoreboard({ game }: { game: HistoryGame }) {
         {
             kind: "summary",
             label: "Oberer Bereich",
-            values: game.players.map((player) => upperSubtotal(player.scores) + bonus(player.scores)),
+            values: game.players.map((player) => upperSubtotal(player.scores) + upperBonus(player.scores)),
         },
         {
             kind: "summary",
@@ -189,6 +157,5 @@ export function CompactScoreboard({ game }: { game: HistoryGame }) {
     );
 }
 
-export { bonus, LOWER, UPPER, upperSubtotal };
-export type { HistoryGame, HistoryPlayer, PlayerScoreMap };
+export type { HistoryGame, HistoryPlayer };
 

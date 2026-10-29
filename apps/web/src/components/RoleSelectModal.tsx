@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { RoomRole, RoomStatusPayload } from "../lib/socket";
 import { ROLE_LABELS } from "../lib/socket";
 
@@ -91,6 +91,17 @@ export default function RoleSelectModal({
           description: slot.connected ? "Bereits verbunden" : "Reserviert für dich",
           countdown,
           isReservedForYou: true,
+        } satisfies RoleEntry;
+      }
+
+      // A disconnected player's seat can be taken over once the grace period has passed.
+      if (!slot.connected && slot.releaseDeadline !== null && slot.releaseDeadline <= now) {
+        return {
+          role,
+          disabled: !trimmed,
+          description: `Frei – ${slot.name ?? "jemand"} ist nicht mehr verbunden`,
+          countdown: null,
+          isReservedForYou: false,
         } satisfies RoleEntry;
       }
 

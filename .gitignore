@@ -1,37 +1,24 @@
-# Logs
-*.log
-server-dev*.log
-server-dev.out
-server-dev.err
-terminal
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Editor
-.vscode/
-.idea/
-
 # Dependencies
 node_modules/
 .pnpm-store/
 
-# Build outputs
+# Build output
 dist/
-build/
 *.tsbuildinfo
+
+# Cloudflare (local dev state and secrets)
+.wrangler/
+.dev.vars*
 
 # Environment
 .env
 .env.local
 
-# Database
-data/
-*.db
-*.sqlite
-*.sqlite3
+# Logs
+*.log
 
-# Temporary files
-*.tmp
-.tmp/
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,6 +1,7 @@
-﻿import react from '@vitejs/plugin-react';
+import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+// During development the game server runs in `wrangler dev` on port 8787 (see `pnpm dev`).
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -8,17 +9,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/socket.io': {
-        target: 'http://localhost:3000',
-        ws: true,
-        changeOrigin: true,
-      },
       '/api': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
-      '/healthz': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:8787',
+        ws: true,
         changeOrigin: true,
       },
     },

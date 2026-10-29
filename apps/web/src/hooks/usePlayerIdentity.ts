@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { normaliseName } from "@kniffel/game";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   AppSocket,
   RoleConfirmedPayload,
@@ -9,11 +10,13 @@ import type {
 } from "../lib/socket";
 
 const PLAYER_SESSION_KEY = "kniffel-player-session";
+const PLAYER_ID_KEY = "kniffel-player-id";
+const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
+/** The seat this browser last played on; used to rejoin automatically. */
 export type PlayerSession = {
   role: RoomRole;
   name: string;
-  sessionId: string;
   timestamp: number;
 };
 
@@ -33,13 +36,17 @@ type UsePlayerIdentityResult = {
   closeModal: () => void;
   claimRole: (role: RoomRole, name: string) => void;
   releaseRole: () => void;
-  resetSession: () => void;
   isClaiming: RoomRole | null;
   error: string | null;
   clearError: () => void;
   suggestedName: string;
 };
 
+/**
+ * Seat handling for this browser. A random player id (kept in localStorage) identifies the
+ * browser to the server, so after a reload or a dropped connection the seat is claimed again
+ * automatically.
+ */
 export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityResult {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [status, setStatus] = useState<RoomStatusPayload | null>(null);
@@ -50,13 +57,14 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
   const [suggestedName, setSuggestedName] = useState("");
 
   const sessionRef = useRef<PlayerSession | null>(null);
-  const restorationAttempted = useRef(false);
+  const identityRef = useRef<Identity | null>(null);
+  const playerIdRef = useRef<string>("");
+  identityRef.current = identity;
 
-  // Initialize session on mount
   useEffect(() => {
+    playerIdRef.current = readOrCreatePlayerId();
     const savedSession = readPlayerSession();
     sessionRef.current = savedSession;
-
     if (savedSession) {
       setSuggestedName(savedSession.name);
       setSessionState("restoring");
@@ -66,110 +74,67 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
     }
   }, []);
 
-  // Socket event handlers
-  const attemptSessionRestore = useCallback((roomStatus: RoomStatusPayload) => {
-    if (!sessionRef.current || !socket) return;
-
-    const session = sessionRef.current;
-    const slot = roomStatus.roles[session.role];
-    if (!slot) {
-      setSessionState("conflict");
-      setModalOpen(true);
-      setSuggestedName(session.name);
-      return;
-    }
-
-    // Check if slot is available or occupied by us
-    if (!slot.occupied || (slot.name && equalsIgnoreCase(slot.name, session.name))) {
-      setIsClaiming(session.role);
-      socket.emit("room:claimRole", {
-        role: session.role,
-        name: session.name,
-      });
-    } else {
-      // Slot is occupied by someone else, session conflict
-      setSessionState("conflict");
-      setModalOpen(true);
-      setSuggestedName(session.name);
-    }
-  }, [socket]);
-
   useEffect(() => {
     if (!socket) return;
 
-    const handleStatus = (payload: RoomStatusPayload) => {
-      setStatus(payload);
-
-      // Try to restore session if we have one but no identity yet
-      if (sessionState === "restoring" && !identity && sessionRef.current && !restorationAttempted.current) {
-        restorationAttempted.current = true;
-        attemptSessionRestore(payload);
-      }
+    const rejoin = () => {
+      const session = sessionRef.current;
+      if (!session) return;
+      setIsClaiming(session.role);
+      if (!identityRef.current) setSessionState("restoring");
+      socket.emit("room:claimRole", { role: session.role, name: session.name, playerId: playerIdRef.current });
     };
 
+    const handleStatus = (payload: RoomStatusPayload) => setStatus(payload);
+
     const handleRoleConfirmed = (payload: RoleConfirmedPayload) => {
-      const newIdentity: Identity = { role: payload.role, name: payload.name };
-      setIdentity(newIdentity);
+      setIdentity({ role: payload.role, name: payload.name });
       setIsClaiming(null);
       setError(null);
       setModalOpen(false);
       setSessionState("active");
-
-      // Save new session
-      const newSession: PlayerSession = {
-        role: payload.role,
-        name: payload.name,
-        sessionId: generateSessionId(),
-        timestamp: Date.now(),
-      };
-      sessionRef.current = newSession;
-      savePlayerSession(newSession);
+      const session: PlayerSession = { role: payload.role, name: payload.name, timestamp: Date.now() };
+      sessionRef.current = session;
+      savePlayerSession(session);
     };
 
     const handleRoleDenied = (payload: RoleDeniedPayload) => {
-      setError(payload?.reason ?? "Rolle kann nicht reserviert werden.");
+      setError(payload?.reason ?? "Platz kann nicht reserviert werden.");
       setIsClaiming(null);
-
-      if (sessionState === "restoring") {
-        // Session restore failed, show modal for new session
-        setSessionState("conflict");
-        setModalOpen(true);
+      if (!identityRef.current) {
+        setSessionState(sessionRef.current ? "conflict" : "no_session");
         setSuggestedName(sessionRef.current?.name ?? "");
-      } else if (!identity) {
         setModalOpen(true);
       }
     };
 
-    const handleRoleRevoked = (_payload: RoleRevokedPayload) => {
+    const handleRoleRevoked = (payload: RoleRevokedPayload) => {
       setIdentity(null);
       setIsClaiming(null);
       setSessionState("conflict");
-      setModalOpen(true);
+      setError(payload?.reason ?? null);
       setSuggestedName(sessionRef.current?.name ?? "");
-    };
-
-    const handleConnect = () => {
-      socket.emit("room:status");
+      sessionRef.current = null;
+      clearPlayerSession();
+      setModalOpen(true);
     };
 
     socket.on("room:status", handleStatus);
     socket.on("room:roleConfirmed", handleRoleConfirmed);
     socket.on("room:roleDenied", handleRoleDenied);
     socket.on("room:roleRevoked", handleRoleRevoked);
-    socket.on("connect", handleConnect);
-
-    handleConnect();
+    socket.on("connect", rejoin);
+    if (socket.connected) rejoin();
 
     return () => {
       socket.off("room:status", handleStatus);
       socket.off("room:roleConfirmed", handleRoleConfirmed);
       socket.off("room:roleDenied", handleRoleDenied);
       socket.off("room:roleRevoked", handleRoleRevoked);
-      socket.off("connect", handleConnect);
+      socket.off("connect", rejoin);
     };
-  }, [socket, identity, sessionState, attemptSessionRestore]);
+  }, [socket]);
 
-  // Helper functions
   const claimRole = useCallback(
     (role: RoomRole, name: string) => {
       if (!socket) return;
@@ -181,9 +146,9 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
       setSuggestedName(normalized);
       setIsClaiming(role);
       setError(null);
-      socket.emit("room:claimRole", { role, name: normalized });
+      socket.emit("room:claimRole", { role, name: normalized, playerId: playerIdRef.current });
     },
-    [socket]
+    [socket],
   );
 
   const releaseRole = useCallback(() => {
@@ -198,34 +163,13 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
     setSuggestedName("");
   }, [socket, identity]);
 
-  const resetSession = useCallback(() => {
-    if (socket && identity) {
-      socket.emit("room:releaseRole");
-    }
-    setIdentity(null);
-    setIsClaiming(null);
-    setSessionState("no_session");
-    setModalOpen(true);
-    sessionRef.current = null;
-    clearPlayerSession();
-    setSuggestedName("");
-    setError(null);
-    restorationAttempted.current = false;
-  }, [socket, identity]);
-
-  const openModal = useCallback(() => {
-    setModalOpen(true);
-  }, []);
+  const openModal = useCallback(() => setModalOpen(true), []);
 
   const closeModal = useCallback(() => {
-    if (identity) {
-      setModalOpen(false);
-    }
+    if (identity) setModalOpen(false);
   }, [identity]);
 
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
+  const clearError = useCallback(() => setError(null), []);
 
   return {
     identity,
@@ -236,7 +180,6 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
     closeModal,
     claimRole,
     releaseRole,
-    resetSession,
     isClaiming,
     error,
     clearError,
@@ -244,20 +187,23 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
   };
 }
 
-// Session management functions
-function readPlayerSession(): PlayerSession | null {
-  if (typeof window === "undefined") return null;
+function storage(): Storage | null {
   try {
-    const raw = window.localStorage.getItem(PLAYER_SESSION_KEY);
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function readPlayerSession(): PlayerSession | null {
+  try {
+    const raw = storage()?.getItem(PLAYER_SESSION_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw) as PlayerSession;
-
-    // Check if session is not too old (30 days)
-    if (Date.now() - session.timestamp > 30 * 24 * 60 * 60 * 1000) {
+    if (!session?.role || !session.name || Date.now() - session.timestamp > SESSION_MAX_AGE_MS) {
       clearPlayerSession();
       return null;
     }
-
     return session;
   } catch {
     clearPlayerSession();
@@ -266,23 +212,31 @@ function readPlayerSession(): PlayerSession | null {
 }
 
 function savePlayerSession(session: PlayerSession) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(PLAYER_SESSION_KEY, JSON.stringify(session));
+  try {
+    storage()?.setItem(PLAYER_SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // private mode: the seat simply is not restored after a reload
+  }
 }
 
 function clearPlayerSession() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(PLAYER_SESSION_KEY);
+  try {
+    storage()?.removeItem(PLAYER_SESSION_KEY);
+  } catch {
+    // ignore
+  }
 }
 
-function generateSessionId(): string {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
-}
-
-function normaliseName(value: string): string {
-  return value.trim().replace(/\s+/g, " ").slice(0, 40);
-}
-
-function equalsIgnoreCase(a: string, b: string): boolean {
-  return a.localeCompare(b, undefined, { sensitivity: "accent" }) === 0;
+function readOrCreatePlayerId(): string {
+  const existing = storage()?.getItem(PLAYER_ID_KEY);
+  if (existing && /^[A-Za-z0-9_-]{8,64}$/.test(existing)) return existing;
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const id = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  try {
+    storage()?.setItem(PLAYER_ID_KEY, id);
+  } catch {
+    // without storage the id lives for this page load only
+  }
+  return id;
 }

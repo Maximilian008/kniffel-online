@@ -1,3 +1,14 @@
+import {
+    determineWinner,
+    roleToSeat,
+    scoreAllCategories,
+    totalScore,
+    type Category,
+    type GamePhase,
+    type GameState,
+    type HistoryEntry,
+    type HistoryQuery,
+} from "@kniffel/game";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatedBackground } from "./autumn/components/common/AnimatedBackground";
 import { StatusToast } from "./autumn/components/common/StatusToast";
@@ -5,6 +16,7 @@ import { TopBar } from "./autumn/components/common/TopBar";
 import { FinishedView } from "./autumn/screens/Game/FinishedView";
 import { GameView, type PlayerStatus } from "./autumn/screens/Game/GameView";
 import { HistoryModal } from "./autumn/screens/History/HistoryModal";
+import type { HistoryGame } from "./autumn/screens/History/history-utils";
 import { SetupScreen, type SetupPlayer } from "./autumn/screens/Setup/SetupScreen";
 import {
     AlertDialog,
@@ -17,74 +29,23 @@ import {
 } from "./autumn/ui/alert-dialog";
 import RoleSelectModal from "./components/RoleSelectModal";
 import { usePlayerIdentity } from "./hooks/usePlayerIdentity";
-import {
-    createSocket,
-    ROLE_LABELS,
-    type AppSocket,
-    type OpponentStatusPayload,
-    type RoomRole,
-} from "./lib/socket";
+import { createSocket, historyUrl, ROLE_LABELS, type AppSocket, type RoomRole } from "./lib/socket";
 import { soundManager } from "./lib/sounds";
-import type {
-    Category,
-    GamePhase,
-    HistoryEntry,
-    PlayerIndex,
-    SerializedGameState,
-} from "./types/shared";
-import { scoreAllCategories } from "./utils/gameRules";
 
 const HISTORY_CACHE_KEY = "kniffel-history-cache";
 
-const UPPER_CATEGORIES: Category[] = [
-    "ones",
-    "twos",
-    "threes",
-    "fours",
-    "fives",
-    "sixes",
-];
-
-const LOWER_CATEGORIES: Category[] = [
-    "threeKind",
-    "fourKind",
-    "fullHouse",
-    "smallStraight",
-    "largeStraight",
-    "yahtzee",
-    "chance",
-];
-
-const ALL_CATEGORIES: Category[] = [...UPPER_CATEGORIES, ...LOWER_CATEGORIES];
-
 type ConnectionPhase = "connecting" | "waiting" | "matched";
-
-type HistoryGame = {
-    id: string;
-    date: string;
-    players: Array<{ name: string; scores: Record<Category, number | null>; total: number }>;
-    winner: string;
-    winnerScore: number;
-};
 
 const historyFormatter = new Intl.DateTimeFormat("de-DE", {
     dateStyle: "medium",
     timeStyle: "short",
 });
 
-function defaultName(index: PlayerIndex) {
+function defaultName(index: number) {
     return `Spieler ${index + 1}`;
 }
 
-function calculateFinalScore(sheet: Record<Category, number | undefined>) {
-    const upper = UPPER_CATEGORIES.reduce((sum, category) => sum + (sheet[category] ?? 0), 0);
-    const lower = LOWER_CATEGORIES.reduce((sum, category) => sum + (sheet[category] ?? 0), 0);
-    const bonus = upper >= 63 ? 35 : 0;
-    return upper + bonus + lower;
-}
-
 function loadHistoryCache(): HistoryEntry[] {
-    if (typeof window === "undefined") return [];
     try {
         const raw = window.localStorage.getItem(HISTORY_CACHE_KEY);
         if (!raw) return [];
@@ -97,54 +58,30 @@ function loadHistoryCache(): HistoryEntry[] {
 }
 
 function cacheHistory(entries: HistoryEntry[]) {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(entries));
+    try {
+        window.localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(entries));
+    } catch {
+        // storage unavailable (private mode) – the cache is optional
+    }
 }
 
 function transformHistoryEntries(entries: HistoryEntry[]): HistoryGame[] {
     return [...entries]
         .sort((a, b) => b.finishedAt - a.finishedAt)
         .map((entry) => {
-            const playerCount = Math.max(
-                entry.playerNames.length,
-                entry.scoreSheets.length,
-                entry.scores.length,
-                2,
-            );
-
+            const playerCount = Math.max(entry.playerNames.length, entry.scoreSheets.length, entry.scores.length, 2);
             const players = Array.from({ length: playerCount }, (_, index) => {
-                const name = entry.playerNames[index]?.trim() || `Spieler ${index + 1}`;
+                const name = entry.playerNames[index]?.trim() || defaultName(index);
                 const sheet = entry.scoreSheets[index] ?? {};
-                const scores: Record<Category, number | null> = ALL_CATEGORIES.reduce(
-                    (acc, category) => {
-                        acc[category] = sheet[category] ?? null;
-                        return acc;
-                    },
-                    {} as Record<Category, number | null>,
-                );
-                const computedTotal = calculateFinalScore(sheet as Record<Category, number | undefined>);
-                const total = entry.scores[index] ?? computedTotal;
-                return { name, scores, total };
+                const total = entry.scores[index] ?? totalScore(sheet);
+                return { name, scores: sheet, total };
             });
-
-            const totals = players.map((player) => player.total);
-            const bestScore = totals.length ? Math.max(...totals) : 0;
-            const declaredWinner = entry.winner?.trim() ?? "";
-            const winnerName = declaredWinner === "Draw" || declaredWinner.length === 0 ? "Unentschieden" : declaredWinner;
-
-            let winnerScore = bestScore;
-            if (declaredWinner && declaredWinner !== "Draw") {
-                const index = players.findIndex((player) => player.name === declaredWinner);
-                if (index >= 0) {
-                    winnerScore = players[index]?.total ?? bestScore;
-                }
-            }
-
+            const winnerScore = Math.max(...players.map((player) => player.total));
             return {
                 id: entry.id,
                 date: historyFormatter.format(new Date(entry.finishedAt)),
                 players,
-                winner: winnerName,
+                winner: entry.winner,
                 winnerScore,
             };
         });
@@ -191,10 +128,8 @@ function getTopBarHint(
 export default function App() {
     const socketRef = useRef<AppSocket | null>(null);
     const [socket, setSocket] = useState<AppSocket | null>(null);
-    const [connectionPhase, setConnectionPhase] = useState<ConnectionPhase>("connecting");
-    const [gameState, setGameState] = useState<SerializedGameState | null>(null);
-    const [opponentConnected, setOpponentConnected] = useState(false);
-    const [playerStatuses, setPlayerStatuses] = useState<PlayerStatus[]>([]);
+    const [isConnected, setIsConnected] = useState(false);
+    const [gameState, setGameState] = useState<GameState | null>(null);
     const [history, setHistory] = useState<HistoryEntry[]>(loadHistoryCache);
     const [historyOpen, setHistoryOpen] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
@@ -209,82 +144,39 @@ export default function App() {
 
     const showToast = useCallback((message: string, duration = 3000) => {
         setToastMessage(message);
-        if (typeof window === "undefined") {
-            return;
-        }
-        if (toastTimeoutRef.current) {
-            window.clearTimeout(toastTimeoutRef.current);
-        }
+        window.clearTimeout(toastTimeoutRef.current);
         toastTimeoutRef.current = window.setTimeout(() => setToastMessage(null), duration);
     }, []);
 
-    useEffect(() => {
-        return () => {
-            if (typeof window !== "undefined" && toastTimeoutRef.current) {
-                window.clearTimeout(toastTimeoutRef.current);
-            }
-        };
-    }, []);
+    useEffect(() => () => window.clearTimeout(toastTimeoutRef.current), []);
 
     useEffect(() => {
         const unsubscribe = soundManager.subscribe((enabled) => setSoundEnabled(enabled));
         return unsubscribe;
     }, []);
 
-    const { socketUrl, apiBaseUrl } = useMemo(() => {
-        if (typeof window === "undefined") return { socketUrl: undefined, apiBaseUrl: "" } as const;
-        const isDev = import.meta.env.DEV;
-        const envServer =
-            (import.meta.env.VITE_SOCKET_URL as string | undefined) ||
-            (import.meta.env.VITE_SERVER_URL as string | undefined) ||
-            undefined;
-        if (isDev) {
-            return { socketUrl: window.location.origin, apiBaseUrl: "" } as const;
-        }
-        const resolved = envServer ?? window.location.origin;
-        return { socketUrl: resolved, apiBaseUrl: resolved } as const;
-    }, []);
-
     useEffect(() => {
-        const instance = createSocket(socketUrl);
+        const instance = createSocket();
         socketRef.current = instance;
         setSocket(instance);
 
         instance.on("connect", () => {
+            setIsConnected(true);
             setIsRolling(false);
         });
-
-        instance.on("disconnect", () => {
-            setConnectionPhase("connecting");
-            setOpponentConnected(false);
-        });
-
-        instance.on("state", (state: SerializedGameState) => {
+        instance.on("disconnect", () => setIsConnected(false));
+        instance.on("state", (state) => {
             setGameState(state);
             setIsRolling(false);
         });
-
-        instance.on("phase", (phase: GamePhase) => {
-            if (phase === "setup") {
-                setConnectionPhase("matched");
-            }
-        });
-
-        instance.on("history", (entries: HistoryEntry[]) => {
+        instance.on("history", (entries) => {
             setHistory(entries);
             cacheHistory(entries);
             setHistoryLoading(false);
         });
-
-        instance.on("action-denied", ({ message }: { message?: string }) => {
-            if (message) {
-                showToast(message);
-            }
+        instance.on("action-denied", ({ message }) => {
+            if (message) showToast(message);
             setIsRolling(false);
-        });
-
-        instance.on("opponent-status", ({ connected }: OpponentStatusPayload) => {
-            setOpponentConnected(connected);
         });
 
         return () => {
@@ -293,9 +185,8 @@ export default function App() {
             socketRef.current = null;
             setSocket(null);
         };
-    }, [showToast, socketUrl]);
+    }, [showToast]);
 
-    const identityApi = usePlayerIdentity(socket);
     const {
         identity,
         status: roomStatus,
@@ -309,30 +200,17 @@ export default function App() {
         error: roleError,
         clearError,
         suggestedName,
-    } = identityApi;
+    } = usePlayerIdentity(socket);
 
-    const playerIndex = identity ? (Number(identity.role.slice(1)) - 1 || 0) : null;
-    const playerNumber = playerIndex !== null ? playerIndex : null;
+    const playerIndex = identity ? roleToSeat(identity.role) : null;
 
-    useEffect(() => {
-        if (!socket) {
-            setConnectionPhase("connecting");
-            return;
-        }
-
-        if (!socket.connected) {
-            setConnectionPhase("connecting");
-            return;
-        }
-
-        if (identity) {
-            setConnectionPhase("matched");
-        } else if (sessionState === "loading" || sessionState === "restoring") {
-            return;
-        } else if (!isModalOpen && !isClaiming) {
-            setConnectionPhase("waiting");
-        }
-    }, [socket, identity, sessionState, isModalOpen, isClaiming]);
+    const connectionPhase: ConnectionPhase = !isConnected
+        ? "connecting"
+        : identity
+            ? "matched"
+            : sessionState === "loading" || sessionState === "restoring"
+                ? "connecting"
+                : "waiting";
 
     useEffect(() => {
         if (isEditingName) return;
@@ -359,49 +237,69 @@ export default function App() {
         }
     }, [playerIndex, gameState, identity?.name, isEditingName, localNameDraft]);
 
-    useEffect(() => {
-        if (!identity) {
-            setOpponentConnected(false);
-            setPlayerStatuses([]);
-            return;
-        }
-        if (!roomStatus) return;
-        const opponentRole = identity.role === "p1" ? "p2" : "p1";
-        const opponentSlot = roomStatus.roles[opponentRole];
-        setOpponentConnected(Boolean(opponentSlot?.connected));
+    const playerStatuses: PlayerStatus[] = useMemo(() => {
+        if (!identity || !roomStatus) return [];
         const capacity = Math.max(2, Math.min(6, roomStatus.capacity || 2));
-        const statuses: PlayerStatus[] = Array.from({ length: capacity }, (_, index) => {
-            const role = (`p${index + 1}`) as RoomRole;
-            const entry = roomStatus.roles[role];
-            const connected = Boolean(entry?.connected);
-            const ready = Boolean(gameState?.ready?.[index]);
-            return { connected, ready };
-        });
-        setPlayerStatuses(statuses);
-        if (typeof roomStatus.capacity === "number" && roomStatus.capacity >= 2 && roomStatus.capacity <= 6) {
-            setPlayerCount(roomStatus.capacity);
-        }
+        return Array.from({ length: capacity }, (_, index) => ({
+            connected: Boolean(roomStatus.roles[`p${index + 1}` as RoomRole]?.connected),
+            ready: Boolean(gameState?.ready?.[index]),
+        }));
     }, [roomStatus, identity, gameState?.ready]);
 
-    useEffect(() => {
-        if (!historyOpen) return;
-        setHistoryLoading(true);
-        fetchHistory().catch(() => {
-            const filter = getHistoryFilter();
-            socketRef.current?.emit("request-history", filter);
-        });
-    }, [historyOpen]);
+    // Any other seat with a connected player counts as "Mitspieler verbunden".
+    const opponentConnected = playerStatuses.some((status, index) => index !== playerIndex && status.connected);
 
-    const lastHistoryKeyRef = useRef<string>("");
     useEffect(() => {
-        const filter = getHistoryFilter();
-        const key = JSON.stringify(filter);
-        if (key === lastHistoryKeyRef.current) return;
-        lastHistoryKeyRef.current = key;
-        fetchHistory().catch(() => {
-            socketRef.current?.emit("request-history", filter);
-        });
-    }, [identity?.name, gameState?.playerNames?.[0], gameState?.playerNames?.[1]]);
+        if (roomStatus && roomStatus.capacity >= 2 && roomStatus.capacity <= 6) {
+            setPlayerCount(roomStatus.capacity);
+        }
+    }, [roomStatus]);
+
+    // A string key keeps the filter stable across state updates (new arrays on every roll).
+    const playerNamesKey = (gameState?.playerNames ?? []).join("\n");
+    const historyFilter = useMemo((): HistoryQuery => {
+        const playerNames = playerNamesKey.split("\n").map((name) => name.trim()).filter(Boolean);
+        if (playerNames.length >= 2) {
+            return { players: playerNames, limit: 50, mode: "exact" };
+        }
+        const me = identity?.name?.trim();
+        if (me) {
+            return { players: [me], limit: 50, mode: "contains" };
+        }
+        return { limit: 50 };
+    }, [playerNamesKey, identity?.name]);
+
+    const fetchHistory = useCallback(async () => {
+        setHistoryLoading(true);
+        const params = new URLSearchParams();
+        if (historyFilter.players?.length) params.set("players", historyFilter.players.join(","));
+        if (historyFilter.limit) params.set("limit", String(historyFilter.limit));
+        if (historyFilter.mode) params.set("mode", historyFilter.mode);
+        try {
+            const response = await fetch(historyUrl(params));
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = (await response.json()) as { history: HistoryEntry[] };
+            setHistory(data.history);
+            cacheHistory(data.history);
+            setHistoryLoading(false);
+        } catch {
+            // Fall back to the WebSocket; the "history" handler ends the loading state.
+            if (socketRef.current?.connected) {
+                socketRef.current.emit("request-history", historyFilter);
+            } else {
+                setHistoryLoading(false);
+            }
+        }
+    }, [historyFilter]);
+
+    useEffect(() => {
+        if (historyOpen) void fetchHistory();
+    }, [historyOpen, fetchHistory]);
+
+    // Refresh the (personalised) history whenever the set of players changes.
+    useEffect(() => {
+        void fetchHistory();
+    }, [fetchHistory]);
 
     const displayNames: string[] = gameState?.playerNames?.length
         ? gameState.playerNames.map((name, index) => name || defaultName(index))
@@ -409,24 +307,21 @@ export default function App() {
 
     const localReady = playerIndex !== null && gameState?.ready ? Boolean(gameState.ready[playerIndex]) : false;
 
-    const finalScores: number[] | null = gameState
-        ? gameState.scoreSheets.map((sheet) => calculateFinalScore(sheet as Record<Category, number | undefined>))
-        : null;
+    const finalScores: number[] | null = useMemo(
+        () => (gameState ? gameState.scoreSheets.map(totalScore) : null),
+        [gameState],
+    );
 
     const winner = useMemo(() => {
-        if (!gameState || gameState.phase !== "finished" || !finalScores) return "";
-        const max = Math.max(...finalScores);
-        const winners = finalScores
-            .map((value, index) => (value === max ? gameState.playerNames[index] || defaultName(index) : null))
-            .filter(Boolean) as string[];
-        return winners.length === 1 ? winners[0]! : "Draw";
+        if (!gameState || gameState.phase !== "finished" || !finalScores) return null;
+        return determineWinner(gameState.playerNames, finalScores);
     }, [finalScores, gameState]);
 
     const isCurrentPlayer = Boolean(
         gameState &&
-        playerNumber !== null &&
+        playerIndex !== null &&
         gameState.phase === "playing" &&
-        gameState.currentPlayer === playerNumber,
+        gameState.currentPlayer === playerIndex,
     );
 
     const previewScores = useMemo(() => {
@@ -446,53 +341,12 @@ export default function App() {
         opponentReady: playerStatuses.some((status, index) => index !== playerIndex && status.ready),
     });
 
-    const transformedHistory = useMemo(() => transformHistoryEntries(history), [history]);
-
-    const historyGames = transformedHistory;
-
-    function getHistoryFilter(): { players?: string[]; limit?: number; mode?: "exact" | "contains" } {
-        const playerNames = (gameState?.playerNames ?? [])
-            .map((name) => (name ?? "").trim())
-            .filter(Boolean);
-        if (playerNames.length >= 2) {
-            return { players: playerNames, limit: 50, mode: "exact" };
-        }
-        const me = identity?.name?.trim();
-        if (me && me.length > 0) {
-            return { players: [me], limit: 50, mode: "contains" };
-        }
-        return { limit: 50 };
-    }
-
-    async function fetchHistory() {
-        try {
-            setHistoryLoading(true);
-            const filter = getHistoryFilter();
-            const params = new URLSearchParams();
-            if (filter.players && filter.players.length > 0) {
-                params.set("players", filter.players.join(","));
-            }
-            if (filter.limit) params.set("limit", String(filter.limit));
-            if (filter.mode) params.set("mode", filter.mode);
-            const base = apiBaseUrl ?? "";
-            const url = `${base}/api/history${params.toString() ? `?${params.toString()}` : ""}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-                return;
-            }
-            const data = (await response.json()) as { history: HistoryEntry[] };
-            setHistory(data.history);
-            cacheHistory(data.history);
-            setHistoryLoading(false);
-        } catch {
-            // Keep spinner until socket fallback delivers data
-        }
-    }
+    const historyGames = useMemo(() => transformHistoryEntries(history), [history]);
 
     function submitName(name: string) {
         if (!socketRef.current || playerIndex === null || !identity) return;
         const trimmed = name.trim();
-        if (!trimmed) return;
+        if (!trimmed || trimmed === gameState?.playerNames[playerIndex]) return;
         socketRef.current.emit("set-name", { name: trimmed });
     }
 
@@ -525,29 +379,38 @@ export default function App() {
         setLocalNameDraft(value.slice(0, 40));
     }
 
+    /** Sends a game action, or explains why nothing happens while the connection is down. */
+    function sendAction(send: (socket: AppSocket) => void): boolean {
+        const current = socketRef.current;
+        if (!current?.connected) {
+            showToast("Keine Verbindung – einen Moment, sie wird wiederhergestellt …");
+            return false;
+        }
+        send(current);
+        return true;
+    }
+
     function handleStart() {
-        if (!socketRef.current || playerIndex === null || !identity) return;
+        if (playerIndex === null || !identity) return;
         const trimmed = localNameDraft.trim() || identity.name;
         submitName(trimmed);
-        socketRef.current.emit("ready");
+        sendAction((socket) => socket.emit("ready"));
     }
 
     function handleRoll() {
-        if (!socketRef.current) return;
-        setIsRolling(true);
-        socketRef.current.emit("roll");
+        if (sendAction((socket) => socket.emit("roll"))) setIsRolling(true);
     }
 
     function handleToggleHold(index: number) {
-        socketRef.current?.emit("toggle-hold", { index });
+        sendAction((socket) => socket.emit("toggle-hold", { index }));
     }
 
     function handleChoose(category: Category) {
-        socketRef.current?.emit("choose", { category });
+        sendAction((socket) => socket.emit("choose", { category }));
     }
 
     function handleReset() {
-        socketRef.current?.emit("reset");
+        sendAction((socket) => socket.emit("reset"));
     }
 
     function handleShowHistory() {
@@ -559,17 +422,13 @@ export default function App() {
     }
 
     function handleRefreshHistory() {
-        setHistoryLoading(true);
-        fetchHistory().catch(() => {
-            const filter = getHistoryFilter();
-            socketRef.current?.emit("request-history", filter);
-        });
+        void fetchHistory();
     }
 
     function handlePlayerCountChange(next: number) {
-        setPlayerCount(next);
-        if (!socketRef.current) return;
+        if (!socketRef.current || !identity) return;
         if (!gameState || gameState.phase !== "setup") return;
+        setPlayerCount(next);
         socketRef.current.emit("room:setCapacity", { capacity: next });
     }
 
@@ -584,7 +443,7 @@ export default function App() {
             const role = (`p${index + 1}`) as RoomRole;
             const connected = Boolean(roomStatus.roles?.[role]?.connected);
             const ready = Boolean(gameState?.ready?.[index]);
-            const isSelf = identity ? index === (Number(identity.role.slice(1)) - 1 || 0) : false;
+            const isSelf = index === playerIndex;
             return { name: name || defaultName(index), connected, ready, isSelf };
         });
     }
@@ -669,12 +528,13 @@ export default function App() {
     const previousPhaseRef = useRef<GamePhase | null>(null);
     useEffect(() => {
         const currentPhase = gameState?.phase ?? null;
-        if (previousPhaseRef.current !== "finished" && currentPhase === "finished" && finalScores) {
+        // Only celebrate the moment a game ends, not when (re)loading a finished game.
+        if (previousPhaseRef.current === "playing" && currentPhase === "finished" && finalScores) {
             soundManager.gameWin();
             const maxScore = Math.max(...finalScores);
             if (maxScore > 0) {
                 showToast(
-                    winner === "Draw"
+                    winner === null
                         ? `🏆 Unentschieden mit ${maxScore} Punkten`
                         : `🏆 ${winner} gewinnt mit ${maxScore} Punkten!`,
                     4000,

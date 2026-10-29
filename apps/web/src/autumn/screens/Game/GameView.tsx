@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { soundManager } from "../../../lib/sounds";
-import type { Category, SerializedGameState } from "../../../types/shared";
+import type { Category, GameState } from "@kniffel/game";
 import { CurrentPlayerIndicator } from "../../components/game/CurrentPlayerIndicator";
 import { DiceArea } from "../../components/game/DiceArea";
 import { Scoreboard } from "../../components/game/Scoreboard";
@@ -13,7 +13,7 @@ export type PlayerStatus = { connected: boolean; ready: boolean };
 // orchestrates player interaction, dice control, and scoreboard display.
 
 type GameViewProps = {
-    state: SerializedGameState;
+    state: GameState;
     playerIndex: number;
     playerNames: string[];
     isCurrentPlayer: boolean;
@@ -44,16 +44,12 @@ export function GameView({
     onToggleSound,
 }: GameViewProps) {
     const rollsLeft = state.rollsLeft;
+    // Optimistic hold state until the server's answer arrives; every new server state wins.
     const [localHeld, setLocalHeld] = useState<boolean[] | null>(null);
-    const lastDiceKey = useRef<string>("");
 
     useEffect(() => {
-        const key = state.dice.join(",");
-        if (key !== lastDiceKey.current) {
-            lastDiceKey.current = key;
-            setLocalHeld(null);
-        }
-    }, [state.dice]);
+        setLocalHeld(null);
+    }, [state]);
 
     const effectiveHeld = useMemo(() => {
         if (localHeld && localHeld.length === state.held.length) {
@@ -62,18 +58,20 @@ export function GameView({
         return state.held;
     }, [localHeld, state.held]);
 
+    const toggleDieRef = useRef<(index: number) => void>(() => {});
 
     useEffect(() => {
-        if (!isCurrentPlayer) return;
-
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-                return;
-            }
+            if (event.ctrlKey || event.metaKey || event.altKey) return;
+            const target = event.target as HTMLElement | null;
+            if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+            if (document.querySelector("[role=dialog], [role=alertdialog], [role=menu]")) return;
+            const onControl = Boolean(target?.closest("button, a, [role=button], [role=menuitem]"));
 
             switch (event.key.toLowerCase()) {
                 case " ":
                 case "enter":
+                    if (onControl || !isCurrentPlayer) return;
                     event.preventDefault();
                     if (rollsLeft > 0 && !isRolling) {
                         soundManager.diceRoll();
@@ -85,12 +83,9 @@ export function GameView({
                 case "3":
                 case "4":
                 case "5":
+                    if (!isCurrentPlayer || rollsLeft === 3) return;
                     event.preventDefault();
-                    if (rollsLeft === 3) return;
-                    {
-                        const index = Number(event.key) - 1;
-                        toggleDie(index);
-                    }
+                    toggleDieRef.current(Number(event.key) - 1);
                     break;
                 case "h":
                     event.preventDefault();
@@ -130,6 +125,7 @@ export function GameView({
         }
         onToggleHold(index);
     };
+    toggleDieRef.current = toggleDie;
 
     return (
         <div className="flex w-full flex-col items-center gap-6 px-4 pb-10">
