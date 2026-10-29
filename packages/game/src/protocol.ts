@@ -70,7 +70,6 @@ export interface ClientEvents {
   "room:claimRole": { role: Role; name: string; playerId: string };
   "room:releaseRole": undefined;
   "room:setCapacity": { capacity: number };
-  "set-name": { name: string };
   ready: undefined;
   roll: undefined;
   "toggle-hold": { index: number };

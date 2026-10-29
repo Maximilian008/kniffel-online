@@ -163,6 +163,11 @@ export class Room {
       case "request-history":
         this.transport.send(connection.id, "history", await this.listHistory(data as HistoryQuery));
         return;
+      case "room:setCapacity":
+        // The first visitor may choose the player count before taking a seat.
+        if (this.ownSeat(connection) === null && this.data.seats.some((s) => s.playerId !== null)) break;
+        this.changeCapacity(connection, data.capacity);
+        return;
     }
 
     const seat = this.ownSeat(connection);
@@ -172,12 +177,6 @@ export class Room {
     }
 
     switch (message.type) {
-      case "room:setCapacity":
-        this.changeCapacity(connection, data.capacity);
-        return;
-      case "set-name":
-        this.rename(connection, seat, data.name);
-        return;
       case "ready":
         this.apply(connection, setReady(this.data.game, seat, true, this.env.now()));
         return;
@@ -260,9 +259,12 @@ export class Room {
     );
     if (duplicate) return deny(`Der Name „${name}“ ist schon vergeben.`);
 
-    // A player holds at most one seat.
+    // A player holds at most one seat; tabs still bound to the old seat are told so.
     this.data.seats.forEach((s, i) => {
-      if (i !== seat && s.playerId === playerId) this.vacate(i);
+      if (i !== seat && s.playerId === playerId) {
+        this.vacate(i);
+        this.revokeSeat(i, connection.id, "Du hast den Platz gewechselt.");
+      }
     });
     // Whoever was connected to this seat before (old owner or another tab) loses it.
     this.revokeSeat(seat, connection.id, "Dein Platz wurde auf einem anderen Gerät übernommen.");
@@ -338,30 +340,6 @@ export class Room {
     }
     this.data.game = result.state;
     this.dirty = true;
-    this.broadcastRoom();
-  }
-
-  private rename(connection: Connection, seat: number, rawName: unknown): void {
-    const name = normaliseName(rawName);
-    if (!name) return this.deny(connection, "Name darf nicht leer sein.");
-    const duplicate = this.data.seats.some(
-      (s, i) => i !== seat && i < this.capacity && s.playerId !== null && nameKey(s.name) === nameKey(name),
-    );
-    if (duplicate) return this.deny(connection, `Der Name „${name}“ ist schon vergeben.`);
-    const result = setPlayerName(this.data.game, seat, name);
-    if (!result.ok) return this.deny(connection, result.error);
-    this.data.game = result.state;
-    this.data.seats[seat].name = name;
-    this.dirty = true;
-    for (const c of this.transport.connections()) {
-      if (c.seat !== seat) continue;
-      this.transport.send(c.id, "room:roleConfirmed", {
-        roomId: this.data.roomId,
-        role: seatToRole(seat),
-        name,
-        playerIndex: seat,
-      });
-    }
     this.broadcastRoom();
   }
 

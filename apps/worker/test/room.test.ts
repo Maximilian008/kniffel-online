@@ -164,6 +164,29 @@ describe("seats", () => {
     expect(clients[0].connection.seat).toBeNull();
   });
 
+  it("lets the first visitor choose the player count before taking a seat", async () => {
+    const server = new FakeServer();
+    const host = server.connect();
+    await host.send("room:setCapacity", { capacity: 4 });
+    expect(server.room.status().capacity).toBe(4);
+    await host.claim(3, "anna", ID.anna);
+    expect(host.last("room:roleConfirmed")).toMatchObject({ role: "p4" });
+
+    const late = server.connect();
+    await late.send("room:setCapacity", { capacity: 2 });
+    expect(late.last("action-denied")?.message).toContain("Sitzplatz");
+    expect(server.room.status().capacity).toBe(4);
+  });
+
+  it("tells a tab when the same player moved to another seat in a different tab", async () => {
+    const { server, clients } = await lobby(["anna", "ben"]);
+    await clients[0].send("room:setCapacity", { capacity: 3 });
+    const otherTab = server.connect();
+    await otherTab.claim(2, "anna", ID.anna);
+    expect(clients[0].last("room:roleRevoked")).toBeDefined();
+    expect(server.room.status().roles.p1).toMatchObject({ occupied: false });
+  });
+
   it("restores seats 3-6 after a restart", async () => {
     const { server } = await lobby(["anna", "ben", "carl"]);
     const restarted = server.createRoom(JSON.parse(JSON.stringify(server.room.data)));
@@ -242,7 +265,7 @@ describe("history", () => {
 
     await clients[1].send("room:releaseRole");
     clients[2].disconnect();
-    await clients[0].send("set-name", { name: "Anna B." });
+    await clients[0].claim(0, "Anna B.", ID.anna); // renaming = claiming the own seat again
     expect(server.entries).toEqual([entry]);
 
     await clients[0].send("reset");

@@ -43,9 +43,9 @@ type UsePlayerIdentityResult = {
 };
 
 /**
- * Seat handling for this browser. A random player id (kept in localStorage) identifies the
- * browser to the server, so after a reload or a dropped connection the seat is claimed again
- * automatically.
+ * Seat handling for this tab. A random player id (kept in sessionStorage, so every tab is its
+ * own player) identifies the tab to the server. After a reload or a dropped connection the seat
+ * is claimed again automatically; a new tab or browser rejoins by name once the old one is gone.
  */
 export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityResult {
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -59,6 +59,8 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
   const sessionRef = useRef<PlayerSession | null>(null);
   const identityRef = useRef<Identity | null>(null);
   const playerIdRef = useRef<string>("");
+  /** True while an automatic rejoin is pending; its denial is expected and needs no error text. */
+  const autoClaimRef = useRef(false);
   identityRef.current = identity;
 
   useEffect(() => {
@@ -82,12 +84,14 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
       if (!session) return;
       setIsClaiming(session.role);
       if (!identityRef.current) setSessionState("restoring");
+      autoClaimRef.current = true;
       socket.emit("room:claimRole", { role: session.role, name: session.name, playerId: playerIdRef.current });
     };
 
     const handleStatus = (payload: RoomStatusPayload) => setStatus(payload);
 
     const handleRoleConfirmed = (payload: RoleConfirmedPayload) => {
+      autoClaimRef.current = false;
       setIdentity({ role: payload.role, name: payload.name });
       setIsClaiming(null);
       setError(null);
@@ -99,7 +103,9 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
     };
 
     const handleRoleDenied = (payload: RoleDeniedPayload) => {
-      setError(payload?.reason ?? "Platz kann nicht reserviert werden.");
+      // e.g. a second tab finds its last seat taken by the first one: just ask for a seat.
+      if (!autoClaimRef.current) setError(payload?.reason ?? "Platz kann nicht reserviert werden.");
+      autoClaimRef.current = false;
       setIsClaiming(null);
       if (!identityRef.current) {
         setSessionState(sessionRef.current ? "conflict" : "no_session");
@@ -146,6 +152,7 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
       setSuggestedName(normalized);
       setIsClaiming(role);
       setError(null);
+      autoClaimRef.current = false;
       socket.emit("room:claimRole", { role, name: normalized, playerId: playerIdRef.current });
     },
     [socket],
@@ -187,17 +194,18 @@ export function usePlayerIdentity(socket: AppSocket | null): UsePlayerIdentityRe
   };
 }
 
-function storage(): Storage | null {
+function storage(kind: "localStorage" | "sessionStorage" = "localStorage"): Storage | null {
   try {
-    return window.localStorage;
+    return window[kind];
   } catch {
     return null;
   }
 }
 
+/** The tab's own seat wins; the browser-wide copy lets a new tab or a restarted browser rejoin. */
 function readPlayerSession(): PlayerSession | null {
   try {
-    const raw = storage()?.getItem(PLAYER_SESSION_KEY);
+    const raw = storage("sessionStorage")?.getItem(PLAYER_SESSION_KEY) ?? storage()?.getItem(PLAYER_SESSION_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw) as PlayerSession;
     if (!session?.role || !session.name || Date.now() - session.timestamp > SESSION_MAX_AGE_MS) {
@@ -212,8 +220,10 @@ function readPlayerSession(): PlayerSession | null {
 }
 
 function savePlayerSession(session: PlayerSession) {
+  const raw = JSON.stringify(session);
   try {
-    storage()?.setItem(PLAYER_SESSION_KEY, JSON.stringify(session));
+    storage("sessionStorage")?.setItem(PLAYER_SESSION_KEY, raw);
+    storage()?.setItem(PLAYER_SESSION_KEY, raw);
   } catch {
     // private mode: the seat simply is not restored after a reload
   }
@@ -221,6 +231,7 @@ function savePlayerSession(session: PlayerSession) {
 
 function clearPlayerSession() {
   try {
+    storage("sessionStorage")?.removeItem(PLAYER_SESSION_KEY);
     storage()?.removeItem(PLAYER_SESSION_KEY);
   } catch {
     // ignore
@@ -228,13 +239,13 @@ function clearPlayerSession() {
 }
 
 function readOrCreatePlayerId(): string {
-  const existing = storage()?.getItem(PLAYER_ID_KEY);
+  const existing = storage("sessionStorage")?.getItem(PLAYER_ID_KEY);
   if (existing && /^[A-Za-z0-9_-]{8,64}$/.test(existing)) return existing;
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   const id = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   try {
-    storage()?.setItem(PLAYER_ID_KEY, id);
+    storage("sessionStorage")?.setItem(PLAYER_ID_KEY, id);
   } catch {
     // without storage the id lives for this page load only
   }

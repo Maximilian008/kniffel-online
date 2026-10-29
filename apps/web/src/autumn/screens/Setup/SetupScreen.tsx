@@ -21,12 +21,6 @@ export type SetupPlayer = {
 type SetupScreenProps = {
     playerCount: number;
     onPlayerCountChange: (count: number) => void;
-    localName: string;
-    localPlaceholder: string;
-    canEditName: boolean;
-    onNameChange: (value: string) => void;
-    onNameFocus: () => void;
-    onNameBlur: () => void;
     onStart: () => void;
     onOpenHistory: () => void;
     startDisabled: boolean;
@@ -119,12 +113,6 @@ function lobbyBadgeText(ready: boolean, connected: boolean) {
 export function SetupScreen({
     playerCount,
     onPlayerCountChange,
-    localName,
-    localPlaceholder,
-    canEditName,
-    onNameChange,
-    onNameFocus,
-    onNameBlur,
     onStart,
     onOpenHistory,
     startDisabled,
@@ -133,12 +121,11 @@ export function SetupScreen({
     players,
 }: SetupScreenProps) {
     const roster = players ?? [];
-    const editableSeatIndex = roster.findIndex((player) => player?.isSelf);
 
     const seats = Array.from({ length: playerCount }, (_, index) => {
         const player = roster[index];
         const trimmedName = player?.name?.trim() ?? "";
-        const isSelf = index === editableSeatIndex || Boolean(player?.isSelf);
+        const isSelf = Boolean(player?.isSelf);
         const displayName = trimmedName.length > 0 ? trimmedName : `Spieler ${index + 1}`;
 
         return {
@@ -147,7 +134,6 @@ export function SetupScreen({
             connected: Boolean(player?.connected),
             ready: Boolean(player?.ready),
             name: displayName,
-            inputValue: isSelf ? localName : displayName,
         };
     });
 
@@ -204,37 +190,6 @@ export function SetupScreen({
                     </section>
 
                     <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                            <span style={labelStyle}>Dein Name</span>
-                            <div
-                                style={{
-                                    backgroundColor: cssVar(setupVars.cardBackground, setupFallbacks.cardBackground),
-                                    borderRadius: "0.6rem",
-                                    border: `1px solid ${cssVar(setupVars.cardBorder, setupFallbacks.cardBorder)}`,
-                                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4)",
-                                }}
-                            >
-                                <Input
-                                    value={localName}
-                                    placeholder={localPlaceholder}
-                                    onChange={(event) => onNameChange(event.target.value)}
-                                    onFocus={onNameFocus}
-                                    onBlur={onNameBlur}
-                                    disabled={!canEditName}
-                                    maxLength={40}
-                                    className={`h-11 w-full border-0 bg-transparent text-base font-medium placeholder:text-[var(${setupVars.inputPlaceholder})] focus-visible:ring-0`}
-                                    style={{
-                                        color: cssVar(setupVars.inputText, setupFallbacks.inputText),
-                                        padding: "0 0.875rem",
-                                        borderRadius: "0.6rem",
-                                    }}
-                                />
-                            </div>
-                            <span style={helperTextStyle}>
-                                {localReady ? "Du bist bereit zum Start." : "Passe deinen Namen an oder warte auf Mitspieler."}
-                            </span>
-                        </div>
-
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                             <span style={labelStyle}>Lobby</span>
                             {roster.length === 0 ? (
@@ -303,7 +258,6 @@ export function SetupScreen({
                             <span style={labelStyle}>Spielerliste</span>
                             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                                 {seats.map((seat) => {
-                                    const isEditable = seat.isSelf && canEditName;
                                     return (
                                         <div key={`seat-input-${seat.index}`} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                                             <span style={{ fontWeight: 600 }}>{`Spieler ${seat.index + 1}`}</span>
@@ -317,13 +271,10 @@ export function SetupScreen({
                                                 }}
                                             >
                                                 <Input
-                                                    value={seat.inputValue}
-                                                    placeholder={`Spieler ${seat.index + 1}`}
-                                                    onChange={isEditable ? (event) => onNameChange(event.target.value) : undefined}
-                                                    onFocus={isEditable ? onNameFocus : undefined}
-                                                    onBlur={isEditable ? onNameBlur : undefined}
-                                                    readOnly={!isEditable}
-                                                    maxLength={40}
+                                                    value={seat.name}
+                                                    aria-label={`Spieler ${seat.index + 1}`}
+                                                    readOnly
+                                                    tabIndex={-1}
                                                     className={`h-11 w-full border-0 bg-transparent text-base font-medium placeholder:text-[var(${setupVars.rootText})] focus-visible:ring-0`}
                                                     style={{
                                                         color: cssVar(setupVars.inputText, setupFallbacks.inputText),

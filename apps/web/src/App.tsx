@@ -133,8 +133,6 @@ export default function App() {
     const [history, setHistory] = useState<HistoryEntry[]>(loadHistoryCache);
     const [historyOpen, setHistoryOpen] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
-    const [localNameDraft, setLocalNameDraft] = useState("");
-    const [isEditingName, setIsEditingName] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const toastTimeoutRef = useRef<number | undefined>(undefined);
     const [isRolling, setIsRolling] = useState(false);
@@ -211,31 +209,6 @@ export default function App() {
             : sessionState === "loading" || sessionState === "restoring"
                 ? "connecting"
                 : "waiting";
-
-    useEffect(() => {
-        if (isEditingName) return;
-        if (!identity) {
-            setLocalNameDraft("");
-            return;
-        }
-        setLocalNameDraft((previous) => (previous ? previous : identity.name));
-    }, [identity, isEditingName]);
-
-    useEffect(() => {
-        if (playerIndex === null || !gameState) return;
-        if (isEditingName) return;
-        const serverName = gameState.playerNames[playerIndex]?.trim();
-        if (serverName) {
-            if (serverName !== localNameDraft) {
-                setLocalNameDraft(serverName);
-            }
-            return;
-        }
-        const fallback = identity?.name ?? defaultName(playerIndex);
-        if (fallback !== localNameDraft) {
-            setLocalNameDraft(fallback);
-        }
-    }, [playerIndex, gameState, identity?.name, isEditingName, localNameDraft]);
 
     const playerStatuses: PlayerStatus[] = useMemo(() => {
         if (!identity || !roomStatus) return [];
@@ -329,8 +302,7 @@ export default function App() {
         return scoreAllCategories(gameState.dice);
     }, [gameState, isCurrentPlayer, playerIndex]);
 
-    const startDisabled =
-        !identity || !localNameDraft.trim() || connectionPhase !== "matched" || playerIndex === null;
+    const startDisabled = !identity || connectionPhase !== "matched" || playerIndex === null;
 
     const topBarHint = getTopBarHint(connectionPhase, gameState?.phase ?? null, opponentConnected);
 
@@ -342,42 +314,6 @@ export default function App() {
     });
 
     const historyGames = useMemo(() => transformHistoryEntries(history), [history]);
-
-    function submitName(name: string) {
-        if (!socketRef.current || playerIndex === null || !identity) return;
-        const trimmed = name.trim();
-        if (!trimmed || trimmed === gameState?.playerNames[playerIndex]) return;
-        socketRef.current.emit("set-name", { name: trimmed });
-    }
-
-    function handleNameFocus() {
-        if (!identity) return;
-        setIsEditingName(true);
-        if (playerIndex !== null && localNameDraft === defaultName(playerIndex)) {
-            setLocalNameDraft("");
-        }
-    }
-
-    function handleNameBlur() {
-        setIsEditingName(false);
-        const trimmed = localNameDraft.trim();
-        if (playerIndex === null) {
-            setLocalNameDraft(trimmed);
-            return;
-        }
-        if (!trimmed) {
-            const fallback = identity?.name ?? defaultName(playerIndex);
-            setLocalNameDraft(fallback);
-            submitName(fallback);
-        } else {
-            setLocalNameDraft(trimmed);
-            submitName(trimmed);
-        }
-    }
-
-    function handleNameChange(value: string) {
-        setLocalNameDraft(value.slice(0, 40));
-    }
 
     /** Sends a game action, or explains why nothing happens while the connection is down. */
     function sendAction(send: (socket: AppSocket) => void): boolean {
@@ -392,8 +328,6 @@ export default function App() {
 
     function handleStart() {
         if (playerIndex === null || !identity) return;
-        const trimmed = localNameDraft.trim() || identity.name;
-        submitName(trimmed);
         sendAction((socket) => socket.emit("ready"));
     }
 
@@ -425,11 +359,13 @@ export default function App() {
         void fetchHistory();
     }
 
+    // Before anyone has a seat, the first visitor sets the player count in the seat dialog.
+    const tableIsEmpty = Boolean(roomStatus) && !Object.values(roomStatus!.roles).some((role) => role?.occupied);
+    const canChangePlayerCount = gameState?.phase === "setup" && (identity !== null || tableIsEmpty);
+
     function handlePlayerCountChange(next: number) {
-        if (!socketRef.current || !identity) return;
-        if (!gameState || gameState.phase !== "setup") return;
-        setPlayerCount(next);
-        socketRef.current.emit("room:setCapacity", { capacity: next });
+        if (!canChangePlayerCount) return;
+        if (sendAction((socket) => socket.emit("room:setCapacity", { capacity: next }))) setPlayerCount(next);
     }
 
     function getSetupPlayers(): SetupPlayer[] | undefined {
@@ -448,8 +384,6 @@ export default function App() {
         });
     }
 
-    const canEditName = Boolean(identity);
-
     const phaseContent = (() => {
         if (sessionState === "loading" || sessionState === "restoring") {
             return (
@@ -465,12 +399,6 @@ export default function App() {
                     <SetupScreen
                         playerCount={playerCount}
                         onPlayerCountChange={handlePlayerCountChange}
-                        localName={localNameDraft}
-                        localPlaceholder={identity?.name ?? (playerIndex !== null ? defaultName(playerIndex) : "Dein Name")}
-                        canEditName={canEditName}
-                        onNameChange={handleNameChange}
-                        onNameFocus={handleNameFocus}
-                        onNameBlur={handleNameBlur}
                         onStart={handleStart}
                         onOpenHistory={handleShowHistory}
                         startDisabled={startDisabled}
@@ -581,6 +509,7 @@ export default function App() {
                     isClaiming={isClaiming}
                     error={roleError}
                     clearError={clearError}
+                    onPlayerCountChange={canChangePlayerCount ? handlePlayerCountChange : undefined}
                 />
 
                 <AlertDialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>

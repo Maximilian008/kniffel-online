@@ -197,3 +197,43 @@
     padding: 1.25rem;
   }
 }
+
+/* Player count chooser in the seat dialog (shown while the table is still empty) */
+.modal-player-count {
+  margin-bottom: 16px;
+}
+
+.modal-stepper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.modal-stepper strong {
+  min-width: 1.5em;
+  font-size: 24px;
+  text-align: center;
+}
+
+.modal-stepper button {
+  appearance: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.modal-stepper button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.modal-stepper button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

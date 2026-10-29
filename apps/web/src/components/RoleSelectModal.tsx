@@ -11,6 +11,8 @@ type Props = {
   isClaiming: RoomRole | null;
   error: string | null;
   clearError: () => void;
+  /** Set while nobody has a seat yet: the first visitor chooses how many play. */
+  onPlayerCountChange?: (count: number) => void;
 };
 
 type RoleEntry = {
@@ -36,6 +38,7 @@ export default function RoleSelectModal({
   isClaiming,
   error,
   clearError,
+  onPlayerCountChange,
 }: Props) {
   const [name, setName] = useState("");
   const [now, setNow] = useState(() => Date.now());
@@ -135,7 +138,30 @@ export default function RoleSelectModal({
           Reserviere eine Rolle und gib deinen Anzeigenamen ein. Wenn du bereits gespielt hast,
           wähle dieselbe Kombination, um sofort wieder einzusteigen.
         </p>
-        {status && (
+        {status && onPlayerCountChange ? (
+          <div className="modal-player-count">
+            <span className="modal-label">Wie viele spielen mit?</span>
+            <div className="modal-stepper">
+              <button
+                type="button"
+                aria-label="Einen Spieler weniger"
+                disabled={status.capacity <= 2}
+                onClick={() => onPlayerCountChange(status.capacity - 1)}
+              >
+                −
+              </button>
+              <strong>{status.capacity}</strong>
+              <button
+                type="button"
+                aria-label="Einen Spieler mehr"
+                disabled={status.capacity >= 6}
+                onClick={() => onPlayerCountChange(status.capacity + 1)}
+              >
+                +
+              </button>
+            </div>
+          </div>
+        ) : status && (
           <p className="modal-hint" style={{ marginTop: 4, marginBottom: 8, color: '#666' }}>
             Spielerzahl: <strong>{Math.max(2, Math.min(6, status.capacity || 2))}</strong>
           </p>

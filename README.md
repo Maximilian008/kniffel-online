@@ -8,8 +8,9 @@ Der Server schläft nicht ein, und der Spielverlauf bleibt dauerhaft gespeichert
 
 ## So wird gespielt
 
-1. Link öffnen, Namen eingeben, einen freien Platz (Spieler 1–6) wählen.
-2. Mit **+/–** die Spielerzahl einstellen und den Link mit den Mitspielern teilen.
+1. Link öffnen. Wer als Erstes kommt, stellt die Spielerzahl (2–6) ein.
+2. Namen eingeben, einen freien Platz wählen und den Link mit den Mitspielern teilen.
+   Die Spielerzahl lässt sich in der Lobby noch ändern.
 3. Wenn alle **„Spiel starten“** gedrückt haben, geht es los. Pro Zug bis zu drei Würfe;
    Würfel antippen hält sie fest, dann ein Feld im Block wählen.
 4. Wer die Seite neu lädt oder kurz die Verbindung verliert, landet automatisch wieder auf seinem Platz.
@@ -41,8 +42,7 @@ pnpm install
 pnpm dev
 ```
 
-Danach <http://localhost:5173> in mehreren Browserfenstern öffnen (z. B. normal + privat), um mit
-mehreren Spielern zu testen. `pnpm dev` startet die Website (Vite) und den Spielserver
+Danach <http://localhost:5173> in mehreren Tabs öffnen. Jeder Tab ist ein eigener Spieler. `pnpm dev` startet die Website (Vite) und den Spielserver
 (`wrangler dev` auf Port 8787) zusammen. Lokale Spielstände liegen in `.wrangler/`.
 
 Prüfen:
